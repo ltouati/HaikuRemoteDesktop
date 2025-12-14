@@ -26,11 +26,12 @@ add_custom_target(package_haiku
     
     # 2. Create Directory Structure
     COMMAND ${CMAKE_COMMAND} -E make_directory ${STAGING_DIR}/apps/HaikuRemoteDesktop
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${STAGING_DIR}/add-ons/input_server/devices
     COMMAND ${CMAKE_COMMAND} -E make_directory ${STAGING_DIR}/data/deskbar/menu/Applications
     
     # 3. Copy Binaries
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:screen_server> ${STAGING_DIR}/apps/HaikuRemoteDesktop/HaikuRemoteDesktop
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:virtual_input_server_addon> ${STAGING_DIR}/apps/HaikuRemoteDesktop/
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:virtual_input_server_addon> ${STAGING_DIR}/add-ons/input_server/devices/virtual_input_server_addon
     
     # 4. Copy Web Assets
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/src/UserlandServer/index.html ${STAGING_DIR}/apps/HaikuRemoteDesktop/index.html

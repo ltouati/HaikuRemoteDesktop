@@ -62,8 +62,4 @@ WORKDIR /work
 COPY . .
 
 # 5. Define build command
-# We force Protobuf_PROTOC_EXECUTABLE to the manually installed compiler (/usr/local/bin/protoc)
-# We disable RC_COMPILER because the cross-compiler image lacks the 'rc' tool.
-# We run 'stage_haiku' instead of 'package_haiku' because 'package create' fails to find system data in the cross environment.
-# The binaries will be in build/package_staging ready to be copied to Haiku.
-CMD ["sh", "-c", "mkdir -p build && cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE -GNinja -DProtobuf_PROTOC_EXECUTABLE=/usr/local/bin/protoc -DRC_COMPILER=OFF && ninja package_haiku"]
+CMD ["sh", "-c", "mkdir -p build && cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE -GNinja -DProtobuf_PROTOC_EXECUTABLE=/usr/local/bin/protoc -DRELEASE_MODE=ON && ninja package_haiku"]

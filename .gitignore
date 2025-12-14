@@ -44,3 +44,4 @@ build/
 node_modules/
 .agent
 GEMINI.md
+cmake-build*

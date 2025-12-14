@@ -53,10 +53,12 @@ public:
 
 
 		// 1. Install Driver & Restart Input Server
+#ifndef RELEASE_MODE
 		fInputManager->InstallDriver();
 		
 		// Wait for Input Server to come up? InstallDriver snoozes 1s.
 		snooze(1000000); 
+#endif 
 
 		// 2. Start Network Server
 		// Retry finding port loop? Input Server might take a moment to create the port.
@@ -154,7 +156,9 @@ public:
 		_StopCapture();
 				
 		// Uninstall Driver (Optional? Or keep it for next time)
+#ifndef RELEASE_MODE
 		fInputManager->UninstallDriver();
+#endif
 
 		_Cleanup();
 		return true;

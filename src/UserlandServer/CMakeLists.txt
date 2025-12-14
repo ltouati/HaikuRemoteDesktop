@@ -5,6 +5,10 @@ project(ScreenServer)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
+if(RELEASE_MODE)
+    add_definitions(-DRELEASE_MODE)
+endif()
+
 # Include directories
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
