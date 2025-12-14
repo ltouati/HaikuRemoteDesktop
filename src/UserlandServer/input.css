@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles from index.html can be moved here if needed */
+body {
+    background-color: #000;
+    color: #fff;
+    overflow: hidden; /* Prevent body scroll, handle in canvas container if needed */
+}

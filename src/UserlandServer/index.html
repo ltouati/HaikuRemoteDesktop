@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haiku Remote Desktop</title>
+    <link href="style.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Protobuf -->
+    <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.5/dist/protobuf.min.js"></script>
+    <script src="messages.js?v=2"></script>
+
+    <style>
+        body {
+            @apply bg-black text-zinc-100 font-sans overflow-hidden;
+        }
+
+        /* Custom Scrollbar for Sidebar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
+
+        /* Pixelated class for screen metrics */
+        .rendering-pixelated {
+            image-rendering: pixelated;
+        }
+
+        .rendering-auto {
+            image-rendering: auto;
+        }
+    </style>
+</head>
+
+<body class="h-screen w-screen flex relative selection:bg-indigo-500 selection:text-white">
+
+    <!-- Background Elements -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <!-- Pure Black requested, removing colorful blobs for now or making them extremely subtle if needed. 
+             User said "black background", so I will remove the blobs to be safe and clean. -->
+    </div>
+
+    <!-- Main Content (Canvas) -->
+    <main class="flex-1 flex items-center justify-center relative transition-all duration-300 ease-in-out"
+        id="main-container">
+
+        <!-- Loading State -->
+        <div id="loading-overlay"
+            class="absolute inset-0 flex flex-col items-center justify-center z-20 bg-zinc-950/80 backdrop-blur-sm transition-opacity duration-500">
+            <div class="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4">
+            </div>
+            <div class="text-zinc-300 font-medium animate-pulse" id="loading-text">Connecting to Server...</div>
+        </div>
+
+        <!-- Canvas -->
+        <video id="screen" autoplay muted playsinline class="hidden"></video>
+        <div class="relative w-full h-full flex items-center justify-center p-6" id="canvas-wrapper">
+            <div class="relative group">
+                <canvas id="screenCanvas"
+                    class="max-w-full max-h-full shadow-2xl ring-1 ring-white/10 cursor-none rendering-pixelated rounded-3xl"></canvas>
+
+                <!-- Sidebar Toggle Button (Floating Chevron) - Overlay on Canvas Edge -->
+                <button id="sidebar-toggle" onclick="toggleSidebar()"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 z-30 bg-indigo-600/80 hover:bg-indigo-500 text-white p-2 rounded-full shadow-lg transition-all duration-300 opacity-0 group-hover:opacity-100 hidden hover:scale-110 backdrop-blur-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Sidebar Drawer -->
+    <aside id="sidebar/panel"
+        class="w-80 h-full bg-sidebar border-l border-sidebarBorder transform translate-x-full transition-transform duration-300 ease-in-out fixed right-0 top-0 z-40 shadow-2xl flex flex-col">
+
+        <!-- Header -->
+        <div
+            class="h-16 flex items-center justify-between px-6 border-b border-sidebarBorder bg-white/5 backdrop-blur-sm">
+            <span class="font-semibold text-lg text-white">Options</span>
+            <button onclick="toggleSidebar()"
+                class="text-zinc-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+            <!-- Main Actions -->
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="disconnectSession()"
+                    class="flex flex-col items-center justify-center p-4 bg-zinc-800 hover:bg-red-500/10 hover:border-red-500/50 border border-zinc-700 rounded-xl transition-all group">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-zinc-400 group-hover:text-red-500 mb-2"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span class="text-xs font-medium text-zinc-300 group-hover:text-red-400">Disconnect</span>
+                </button>
+                <button onclick="toggleFullscreen()"
+                    class="flex flex-col items-center justify-center p-4 bg-zinc-800 hover:bg-indigo-500/10 hover:border-indigo-500/50 border border-zinc-700 rounded-xl transition-all group">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                        class="h-6 w-6 text-zinc-400 group-hover:text-indigo-400 mb-2" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 4l-5-5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    <span class="text-xs font-medium text-zinc-300 group-hover:text-indigo-400">Fullscreen</span>
+                </button>
+            </div>
+
+            <!-- Session Options -->
+            <div class="space-y-4">
+                <div class="flex items-center gap-2 text-sm font-semibold text-zinc-500 uppercase tracking-wider">
+                    Session Options
+                </div>
+
+                <!-- Resize Remote -->
+                <label class="flex items-start gap-3 cursor-pointer group">
+                    <div class="relative flex items-center mt-0.5">
+                        <input type="checkbox" id="opt-resize-remote" onchange="updateFit()" class="peer sr-only">
+                        <div
+                            class="w-5 h-5 border-2 border-zinc-600 rounded peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-colors flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-zinc-200 group-hover:text-white">Resize remote screen</div>
+                        <div class="text-xs text-zinc-500 mt-0.5">Matches Haiku resolution to window</div>
+                    </div>
+                </label>
+
+                <!-- Scale Local -->
+                <label class="flex items-start gap-3 cursor-pointer group">
+                    <div class="relative flex items-center mt-0.5">
+                        <input type="checkbox" id="opt-scale-local" onchange="updateFit()" class="peer sr-only">
+                        <div
+                            class="w-5 h-5 border-2 border-zinc-600 rounded peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-colors flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-zinc-200 group-hover:text-white">Scale to window</div>
+                        <div class="text-xs text-zinc-500 mt-0.5">Fits image to view (client-side)</div>
+                    </div>
+                </label>
+
+                <!-- Pixelated / Smooth -->
+                <label class="flex items-start gap-3 cursor-pointer group">
+                    <div class="relative flex items-center mt-0.5">
+                        <input type="checkbox" id="opt-smooth" onchange="updateSmoothing()" class="peer sr-only">
+                        <div
+                            class="w-5 h-5 border-2 border-zinc-600 rounded peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-colors flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-zinc-200 group-hover:text-white">Smooth Scaling</div>
+                        <div class="text-xs text-zinc-500 mt-0.5">Disable for pixel-perfect clarity</div>
+                    </div>
+                </label>
+
+                <!-- Video Codec -->
+                <div class="flex items-center justify-between pt-2">
+                    <div class="text-sm font-medium text-zinc-200">Video Codec</div>
+                    <select id="opt-codec" onchange="sendCodecChange()"
+                        class="bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded px-2 py-1 outline-none focus:border-indigo-500 cursor-pointer">
+                        <option value="vp8">VP8</option>
+                        <option value="vp9">VP9</option>
+                    </select>
+                </div>
+            </div>
+
+        </div>
+
+        <hr class="border-zinc-800">
+
+        <!-- Video Stats -->
+        <div class="space-y-4">
+            <div class="flex items-center justify-between text-sm font-semibold text-zinc-500 uppercase tracking-wider">
+                <span>Video Stream</span>
+                <span id="codec-display"
+                    class="text-xs normal-case bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">VP8</span>
+            </div>
+
+            <div class="bg-zinc-900 rounded-lg p-3 space-y-2 border border-zinc-800">
+                <div class="flex justify-between text-xs">
+                    <span class="text-zinc-500">Resolution</span>
+                    <span class="text-zinc-300 font-mono" id="stat-res">--x--</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-zinc-500">FPS</span>
+                    <span class="text-zinc-300 font-mono" id="stat-fps">0</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-zinc-500">Latency (RTT)</span>
+                    <span class="text-zinc-300 font-mono" id="stat-rtt">-- ms</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-zinc-500">Bitrate</span>
+                    <span class="text-zinc-300 font-mono" id="stat-bitrate">--</span>
+                </div>
+                <div class="flex justify-between text-xs pt-2 border-t border-zinc-800">
+                    <span class="text-zinc-500">Buffer</span>
+                    <span class="text-zinc-300 font-mono" id="stat-buf">0s</span>
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <div class="text-[10px] uppercase font-semibold text-zinc-500 mb-1">FPS History (2 min)</div>
+                <canvas id="fps-graph" width="280" height="60"
+                    class="w-full bg-zinc-900 rounded border border-zinc-800"></canvas>
+            </div>
+        </div>
+
+        <hr class="border-zinc-800">
+
+
+
+        <!-- Footer Info -->
+        <div class="pt-6 text-center">
+            <div class="text-[10px] text-zinc-600">
+                Haiku Remote Desktop<br>
+                v1.0 &bull; <span id="connection-status" class="text-red-500">Disconnected</span>
+            </div>
+        </div>
+        </div>
+    </aside>
+
+    <!-- Overlay for closing sidebar -->
+    <div id="sidebar-overlay" onclick="toggleSidebar()"
+        class="fixed inset-0 bg-black/50 z-30 hidden opacity-0 transition-opacity duration-300"></div>
+
+    <!-- Logic -->
+    <script>
+        // --- Sidebar Logic ---
+        const sidebar = document.getElementById('sidebar/panel');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        let isSidebarOpen = false;
+
+        function toggleSidebar() {
+            isSidebarOpen = !isSidebarOpen;
+            if (isSidebarOpen) {
+                sidebar.classList.remove('translate-x-full');
+                sidebarOverlay.classList.remove('hidden');
+                // Force reflow for opacity transition
+                void sidebarOverlay.offsetWidth;
+                sidebarOverlay.classList.remove('opacity-0');
+            } else {
+                sidebar.classList.add('translate-x-full');
+                sidebarOverlay.classList.add('opacity-0');
+                setTimeout(() => {
+                    if (!isSidebarOpen) sidebarOverlay.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        function disconnectSession() {
+            if (ws) ws.close();
+            window.location.reload();
+        }
+
+        // --- View Options ---
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+        function handleFullscreenChange() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            const canvas = document.getElementById('screenCanvas');
+
+            if (document.fullscreenElement) {
+                // Formatting for Fullscreen
+                wrapper.classList.remove('p-6');
+                wrapper.classList.add('p-0');
+
+                // Force stretch to fill screen
+                canvas.classList.remove('rounded-3xl', 'shadow-2xl', 'ring-1', 'max-w-full', 'max-h-full');
+                canvas.classList.add('rounded-none', 'w-full', 'h-full');
+                canvas.style.width = '100vw'; // Override inline styles from updateFit
+                canvas.style.height = '100vh';
+            } else {
+                // Restore Windowed Look
+                wrapper.classList.add('p-6');
+                wrapper.classList.remove('p-0');
+
+                // Restore normal fitting styles
+                canvas.classList.add('rounded-3xl', 'shadow-2xl', 'ring-1');
+                canvas.classList.remove('rounded-none', 'w-full', 'h-full');
+
+                // Re-apply fit logic to reset inline styles
+                updateFit();
+            }
+        }
+
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            updateFit();
+        });
+
+        function updateFit() {
+            const resizeRemote = document.getElementById('opt-resize-remote').checked;
+            const scaleLocal = document.getElementById('opt-scale-local').checked;
+
+            const canvas = document.getElementById('screenCanvas');
+
+            // 1. Remote Resizing Logic
+            if (resizeRemote) {
+                // Debounce resolution change
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    sendResolution();
+                }, 500);
+            }
+
+            // 2. Local Scaling Logic
+            // If we resize remote, we implicitly want to scale local to fit the new size 1:1, 
+            // but if the window changes size, we want the canvas to follow until the next resize triggers.
+            // OR the user might want native 1:1 but resizing remote.
+            // Usually "Resize Remote" implies "Make remote size == window size", so it fits perfectly 1:1.
+            // "Scale Local" means "Squash remote size into window size".
+
+            if (scaleLocal || resizeRemote) {
+                // Constrain to window
+                canvas.style.width = 'auto';
+                canvas.style.height = 'auto';
+                canvas.classList.add('max-w-full', 'max-h-full');
+            } else {
+                // Native size (might overflow) - Actual 1:1 Pixel Mapping
+                // Use video source dimensions or last known width/height
+                // We can use style.width to force it
+                canvas.style.width = window.width ? window.width + 'px' : 'auto'; // Fallback
+                canvas.style.height = window.height ? window.height + 'px' : 'auto';
+
+                // Using internal tracking of remote resolution if possible
+                // For now, let's just remove max constraints and let it flow.
+                // But we need to ensure it doesn't shrink.
+                canvas.classList.remove('max-w-full', 'max-h-full');
+
+                // Explicitly set size to match video buffer if known?
+                // The canvas is drawn from video, so its internal resolution is set in drawFrame/init.
+                // We just need to ensure CSS doesn't shrink it.
+                // setting width/height to auto without max-width should default to intrinsic size of canvas (which is set to window.width/height in init)
+                canvas.style.width = '';
+                canvas.style.height = '';
+            }
+        }
+
+        function updateSmoothing() {
+            const smooth = document.getElementById('opt-smooth').checked;
+            const canvas = document.getElementById('screenCanvas');
+            if (smooth) {
+                canvas.classList.remove('rendering-pixelated');
+                canvas.classList.add('rendering-auto');
+            } else {
+                canvas.classList.add('rendering-pixelated');
+                canvas.classList.remove('rendering-auto');
+            }
+        }
+
+        // --- Logic from original script (Preserved) ---
+        class WebMBuilder {
+            constructor(width, height, codec) {
+                this.width = width;
+                this.height = height;
+                this.codec = codec || "vp8";
+                this.clusterTimecode = 0;
+            }
+            writeUint(num, bytes = 0) {
+                if (bytes === 0) {
+                    if (num < 256) bytes = 1;
+                    else if (num < 65536) bytes = 2;
+                    else if (num < 16777216) bytes = 3;
+                    else bytes = 4;
+                }
+                let buf = new Uint8Array(bytes);
+                for (let i = bytes - 1; i >= 0; i--) {
+                    buf[i] = num & 0xFF;
+                    num >>= 8;
+                }
+                return buf;
+            }
+            writeVint(num) {
+                let bytes = [];
+                let length = 1;
+                let mask = 0x80;
+                if (num < 127) { }
+                else if (num < 16383) { length = 2; mask = 0x40; }
+                else if (num < 2097151) { length = 3; mask = 0x20; }
+                else if (num < 268435455) { length = 4; mask = 0x10; }
+                else throw "VINT too large";
+                num |= (mask << ((length - 1) * 8));
+                for (let i = length - 1; i >= 0; i--) {
+                    bytes.push((num >> (i * 8)) & 0xFF);
+                }
+                return new Uint8Array(bytes);
+            }
+            element(id, data) {
+                let idBytes = this.hexToBytes(id);
+                let lenBytes = this.writeVint(data.byteLength);
+                let buf = new Uint8Array(idBytes.byteLength + lenBytes.byteLength + data.byteLength);
+                buf.set(idBytes, 0);
+                buf.set(lenBytes, idBytes.byteLength);
+                buf.set(data, idBytes.byteLength + lenBytes.byteLength);
+                return buf;
+            }
+            hexToBytes(hex) {
+                if (hex.length % 2 !== 0) hex = "0" + hex;
+                let bytes = [];
+                for (let i = 0; i < hex.length; i += 2) bytes.push(parseInt(hex.substr(i, 2), 16));
+                return new Uint8Array(bytes);
+            }
+            concat(arrays) {
+                let total = 0;
+                for (let a of arrays) total += a.byteLength;
+                let res = new Uint8Array(total);
+                let off = 0;
+                for (let a of arrays) {
+                    res.set(a, off);
+                    off += a.byteLength;
+                }
+                return res;
+            }
+            strToBytes(str) {
+                let bytes = [];
+                for (let i = 0; i < str.length; i++) bytes.push(str.charCodeAt(i));
+                return new Uint8Array(bytes);
+            }
+            getInitSegment() {
+                const codecId = this.codec === "vp9" ? "V_VP9" : "V_VP8";
+                const ebml = this.element("1A45DFA3", this.concat([
+                    this.element("4286", this.writeUint(1)),
+                    this.element("42F7", this.writeUint(1)),
+                    this.element("42F2", this.writeUint(4)),
+                    this.element("42F3", this.writeUint(8)),
+                    this.element("4282", this.strToBytes("webm")),
+                    this.element("4287", this.writeUint(2)),
+                    this.element("4285", this.writeUint(2))
+                ]));
+                const info = this.element("1549A966", this.concat([
+                    this.element("2AD7B1", this.writeUint(1000000)),
+                    this.element("4D80", this.strToBytes("HaikuRemote"))
+                ]));
+                const tracks = this.element("1654AE6B", this.concat([
+                    this.element("AE", this.concat([
+                        this.element("D7", this.writeUint(1)),
+                        this.element("73C5", this.writeUint(1)),
+                        this.element("83", this.writeUint(1)),
+                        this.element("86", this.strToBytes(codecId)),
+                        this.element("E0", this.concat([
+                            this.element("B0", this.writeUint(this.width)),
+                            this.element("BA", this.writeUint(this.height))
+                        ]))
+                    ]))
+                ]));
+                const segmentHeader = this.hexToBytes("1853806701FFFFFFFFFFFFFF");
+                return this.concat([ebml, segmentHeader, info, tracks]);
+            }
+            getCluster(packet, timecode, isKey) {
+                let tc = timecode - this.clusterTimecode;
+                if (tc < 0 || tc > 32767) {
+                    this.clusterTimecode = timecode;
+                    tc = 0;
+                }
+                let track = this.writeVint(1);
+                let flags = isKey ? 0x80 : 0x00;
+                let tcBytes = new Uint8Array([(tc >> 8) & 0xFF, tc & 0xFF]);
+                let sbData = new Uint8Array(track.byteLength + 2 + 1 + packet.byteLength);
+                sbData.set(track, 0);
+                sbData.set(tcBytes, track.byteLength);
+                sbData[track.byteLength + 2] = flags;
+                sbData.set(packet, track.byteLength + 3);
+                let sb = this.element("A3", sbData);
+                let cTc = this.element("E7", this.writeUint(this.clusterTimecode));
+                return this.element("1F43B675", this.concat([cTc, sb]));
+            }
+        }
+
+        // --- Global State ---
+        const video = document.getElementById('screen');
+        const canvas = document.getElementById('screenCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+
+        let mediaSource = new MediaSource();
+        video.src = URL.createObjectURL(mediaSource);
+
+        let sourceBuffer = null;
+        let queue = [];
+        let muxer = null;
+        let serverCodec = null;
+        let frameCounter = 0;
+        let lastRTT = 0;
+        window.byteCounter = 0; // Global for stats loop
+
+        // --- UI Updates ---
+        const elRes = document.getElementById('stat-res');
+        const elFps = document.getElementById('stat-fps');
+        const elRtt = document.getElementById('stat-rtt');
+        const elBitrate = document.getElementById('stat-bitrate');
+        const elBuf = document.getElementById('stat-buf');
+        const elCodec = document.getElementById('codec-display');
+        const elLoading = document.getElementById('loading-overlay');
+        const elLoadingText = document.getElementById('loading-text');
+        const elConnStatus = document.getElementById('connection-status');
+        const elSidebarToggle = document.getElementById('sidebar-toggle');
+
+        function updateStatusUI(connected) {
+            if (connected) {
+                elLoading.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => elLoading.classList.add('hidden'), 500);
+                elConnStatus.textContent = "Connected";
+                elConnStatus.className = "text-green-500 font-semibold";
+                elSidebarToggle.classList.remove('hidden');
+            } else {
+                elLoading.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+                elLoadingText.textContent = "Disconnected. Reconnecting...";
+                elConnStatus.textContent = "Disconnected";
+                elConnStatus.className = "text-red-500 font-semibold";
+                elSidebarToggle.classList.add('hidden');
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        // Rendering Loop
+        function drawFrame(now) {
+            if (canvas.width > 0 && canvas.height > 0) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                frameCounter++;
+            }
+        }
+
+        if ('requestVideoFrameCallback' in video) {
+            function videoLoop(now, metadata) {
+                drawFrame(now);
+                video.requestVideoFrameCallback(videoLoop);
+            }
+            video.requestVideoFrameCallback(videoLoop);
+        } else {
+            function rafLoop(now) {
+                if (video.readyState >= 2) drawFrame(now);
+                requestAnimationFrame(rafLoop);
+            }
+            requestAnimationFrame(rafLoop);
+        }
+
+        // Stats Loop
+        setInterval(() => {
+            elRes.textContent = `${canvas.width}x${canvas.height}`;
+            elFps.textContent = frameCounter;
+            elRtt.textContent = lastRTT + " ms";
+
+            // Colors for RTT
+            if (lastRTT < 50) elRtt.className = "text-green-400 text-right font-mono";
+            else if (lastRTT < 150) elRtt.className = "text-yellow-400 text-right font-mono";
+            else elRtt.className = "text-red-400 text-right font-mono";
+
+            if (video.buffered.length > 0) {
+                const bufStr = (video.buffered.end(video.buffered.length - 1) - video.buffered.start(0)).toFixed(2);
+                elBuf.textContent = bufStr + "s";
+            }
+
+            // Calculate Bitrate
+            // byteCounter is local to setupInput scope, this global loop can't see it easily unless we lift scope or expose it.
+            // Actually, setupInput is called in ws.onopen.
+            // The polling loop is global (lines 608-626).
+            // We need to move the polling loop or the variables.
+            // Let's make byteCounter global (defined with other stats)
+
+            if (window.byteCounter !== undefined) {
+                const bitrate = ((window.byteCounter * 8) / 1000000).toFixed(2); // Mbps
+                elBitrate.textContent = bitrate + " Mbps";
+                window.byteCounter = 0;
+            }
+
+            // FPS Graph
+            updateFPSGraph(frameCounter);
+
+            frameCounter = 0;
+        }, 1000);
+
+        // Graph Logic
+        const fpsHistory = new Array(120).fill(0);
+        const graphCanvas = document.getElementById('fps-graph');
+        const graphCtx = graphCanvas.getContext('2d');
+
+        function updateFPSGraph(currentFps) {
+            fpsHistory.push(currentFps);
+            if (fpsHistory.length > 120) fpsHistory.shift();
+
+            const w = graphCanvas.width;
+            const h = graphCanvas.height;
+            graphCtx.clearRect(0, 0, w, h);
+
+            // Draw Grid
+            graphCtx.strokeStyle = '#27272a'; // zinc-800
+            graphCtx.lineWidth = 1;
+            graphCtx.beginPath();
+            // Horizontal lines (0, 30, 60 fps)
+            const y30 = h - (30 / 60) * h;
+            const y60 = 0;
+            graphCtx.moveTo(0, y30); graphCtx.lineTo(w, y30);
+            graphCtx.moveTo(0, y60); graphCtx.lineTo(w, y60);
+            graphCtx.stroke();
+
+            // Draw Line
+            graphCtx.strokeStyle = '#6366f1'; // indigo-500
+            graphCtx.lineWidth = 2;
+            graphCtx.beginPath();
+
+            const step = w / (fpsHistory.length - 1);
+
+            for (let i = 0; i < fpsHistory.length; i++) {
+                const fps = fpsHistory[i];
+                const x = i * step;
+                const y = h - (Math.min(fps, 60) / 60) * h;
+                if (i === 0) graphCtx.moveTo(x, y);
+                else graphCtx.lineTo(x, y);
+            }
+            graphCtx.stroke();
+
+            // Draw Fill
+            graphCtx.fillStyle = 'rgba(99, 102, 241, 0.2)'; // indigo-500 with opacity
+            graphCtx.lineTo(w, h);
+            graphCtx.lineTo(0, h);
+            graphCtx.fill();
+        }
+
+        // MSE Logic
+        function createSourceBuffer() {
+            if (mediaSource.readyState === 'open' && serverCodec && !sourceBuffer) {
+                try {
+                    let codecStr = 'vp8';
+                    if (serverCodec === 'vp9') codecStr = 'vp09.00.10.08';
+
+                    console.log(`Creating SourceBuffer with codec: ${codecStr}`);
+                    sourceBuffer = mediaSource.addSourceBuffer(`video/webm; codecs="${codecStr}"`);
+                    setupSourceBufferEvents();
+
+                    if (queue.length > 0 && !sourceBuffer.updating) {
+                        sourceBuffer.appendBuffer(queue.shift());
+                    }
+                } catch (e) {
+                    console.error("MSE Error", e);
+                    elLoadingText.textContent = "Media Source Error (See Console)";
+                }
+            }
+        }
+
+        mediaSource.addEventListener('sourceopen', () => {
+            createSourceBuffer();
+        });
+
+        function setupSourceBufferEvents() {
+            sourceBuffer.addEventListener('updateend', () => {
+                if (sourceBuffer.updating) return;
+
+                // Cleanup
+                if (video.buffered.length > 0) {
+                    const start = video.buffered.start(0);
+                    const current = video.currentTime;
+                    if (current - start > 10) {
+                        sourceBuffer.remove(0, current - 10);
+                        return;
+                    }
+                }
+
+                // Process Queue
+                if (queue.length > 0) {
+                    sourceBuffer.appendBuffer(queue.shift());
+                }
+
+                // Auto-Play
+                if (video.paused) {
+                    video.play().catch(e => console.log("Autoplay blocked/waiting"));
+                }
+
+                // Sync
+                if (video.buffered.length > 0) {
+                    const start = video.buffered.start(0);
+                    const end = video.buffered.end(video.buffered.length - 1);
+                    const diff = end - video.currentTime;
+                    if (video.readyState < 2 && video.currentTime < start) {
+                        video.currentTime = start;
+                    } else if (diff > 0.5) {
+                        video.currentTime = end - 0.1;
+                    }
+                }
+            });
+        }
+
+        // WebSocket & Protocol
+        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        let InputEvent = null;
+        let ws = null;
+
+        function loadProto() {
+            return new Promise((resolve, reject) => {
+                if (typeof protobuf === 'undefined') return reject("protobuf.js not loaded");
+                const checkProto = () => {
+                    if (typeof protobuf === 'undefined') { setTimeout(checkProto, 100); return; }
+                    const root = protobuf.roots.default || protobuf.roots["default"];
+                    if (!root || !root.haiku) { setTimeout(checkProto, 100); return; }
+                    try {
+                        InputEvent = root.haiku.remote.InputEvent;
+                        resolve();
+                    } catch (e) { reject(e); }
+                };
+                checkProto();
+            });
+        }
+
+        function initMediaSource(codec) {
+            console.log("Initializing Media Source with codec:", codec);
+
+            serverCodec = codec;
+            elCodec.textContent = codec.toUpperCase();
+            muxer = new WebMBuilder(width, height, codec);
+            canvas.width = width;
+            canvas.height = height;
+            queue = [];
+
+            // Full Reset Strategy to avoid QuotaExceededError and InvalidStateError
+            // removeSourceBuffer is unreliable for swapping codecs on the fly without
+            // potentially hitting implementation limits or race conditions.
+
+            if (mediaSource) {
+                try {
+                    if (mediaSource.readyState === 'open') {
+                        mediaSource.endOfStream();
+                    }
+                } catch (e) { }
+                // No need to manually removeSourceBuffer if we are discarding mediaSource
+            }
+
+            // Recreate MediaSource
+            mediaSource = new MediaSource();
+            video.src = URL.createObjectURL(mediaSource);
+            sourceBuffer = null;
+
+            mediaSource.addEventListener('sourceopen', () => {
+                createSourceBuffer();
+                if (sourceBuffer) {
+                    const initSeg = muxer.getInitSegment();
+                    queue.push(initSeg);
+                    if (!sourceBuffer.updating) {
+                        try {
+                            sourceBuffer.appendBuffer(queue.shift());
+                        } catch (e) {
+                            console.error("Append Error during Init:", e);
+                        }
+                    }
+                }
+            });
+        }
+
+        let reconnectTimer = null;
+
+        function connect() {
+            if (ws) {
+                // Ensure old socket is closed and listeners removed
+                ws.onopen = null;
+                ws.onclose = null;
+                ws.onerror = null;
+                ws.onmessage = null;
+                ws.close();
+            }
+
+            ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
+            ws.binaryType = "arraybuffer";
+
+            ws.onopen = () => {
+                console.log("Connected");
+                if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+                updateStatusUI(true);
+                setupInput();
+
+                // Start Ping Loop
+                if (window.pingInterval) clearInterval(window.pingInterval);
+                window.pingInterval = setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        sendEvent({ ping: { timestamp: Date.now(), lastRtt: lastRTT } });
+                    }
+                }, 1000);
+            };
+
+            ws.onclose = (e) => {
+                console.log("Connection Closed", e);
+                updateStatusUI(false);
+                attemptReconnect();
+            };
+
+            ws.onerror = (err) => {
+                console.error("WebSocket Error", err);
+                // onerror usually is followed by onclose, but we update UI immediately
+                updateStatusUI(false);
+            };
+
+            let frameCount = 0;
+            let startTime = 0;
+            let lastTimecode = -1;
+            // let byteCounter = 0; // Use window.byteCounter
+
+            ws.onmessage = (e) => {
+                if (typeof e.data === "string") {
+                    window.byteCounter += e.data.length;
+                    const config = JSON.parse(e.data);
+                    if (config.type === "init") {
+                        window.width = config.width;
+                        window.height = config.height;
+                        initMediaSource(config.codec || "vp8");
+                    }
+                } else {
+                    if (!muxer || !sourceBuffer) return;
+
+                    const raw = new Uint8Array(e.data);
+                    window.byteCounter += raw.byteLength;
+                    if (raw.length < 5) { handleServerMessage(raw); return; }
+                    if (raw[raw.length - 4] !== 0xDE || raw[raw.length - 3] !== 0xAD) { handleServerMessage(raw); return; }
+
+                    const flags = raw[0];
+                    const packet = raw.subarray(1, raw.length - 4);
+                    const isKey = (flags & 0x01) !== 0;
+
+                    if (isKey && queue.length > 2) queue = [];
+                    if (frameCount === 0 && !isKey) return;
+                    frameCount++;
+                    if (startTime === 0) startTime = Date.now();
+                    let timecode = Math.floor(Date.now() - startTime);
+                    if (timecode <= lastTimecode) timecode = lastTimecode + 1;
+                    lastTimecode = timecode;
+
+                    try {
+                        let cluster = muxer.getCluster(packet, timecode, isKey);
+                        queue.push(cluster);
+                        if (!sourceBuffer.updating) sourceBuffer.appendBuffer(queue.shift());
+                    } catch (err) { console.error(err); }
+                }
+            };
+
+            function handleServerMessage(raw) {
+                if (!InputEvent) return;
+                try {
+                    const msg = InputEvent.decode(raw);
+                    // PING (3)
+                    if (msg.type === 3 && msg.ping) {
+                        const sent = msg.ping.timestamp;
+                        if (sent) lastRTT = Date.now() - sent;
+                    }
+                    // CLIPBOARD (6)
+                    else if (msg.type === 6 && msg.clipboard) {
+                        const text = msg.clipboard.text;
+                        if (text && text !== lastClipboardText) {
+                            lastClipboardText = text;
+                            console.log("[Auto-Clip] Received from Server:", text.substring(0, 20) + "...");
+                            if (document.hasFocus()) {
+                                navigator.clipboard.writeText(text).catch(err => console.log("Write Clip Error", err));
+                            }
+                        }
+                    }
+                } catch (e) { }
+            }
+        }
+
+        function attemptReconnect() {
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(() => {
+                if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+                    console.log("Attempting Reconnect...");
+                    connect();
+                }
+            }, 2000);
+        }
+
+        function sendEvent(payload) {
+            if (!ws || ws.readyState !== WebSocket.OPEN || !InputEvent) return;
+            const cleanPayload = {};
+            if (payload.mouse) { cleanPayload.type = 1; cleanPayload.mouse = payload.mouse; }
+            else if (payload.key) { cleanPayload.type = 2; cleanPayload.key = payload.key; }
+            else if (payload.ping) { cleanPayload.type = 3; cleanPayload.ping = payload.ping; }
+            else if (payload.resolution) { cleanPayload.type = 4; cleanPayload.resolution = payload.resolution; }
+            else if (payload.codec) { cleanPayload.type = 5; cleanPayload.codec = payload.codec; }
+            else if (payload.clipboard) { cleanPayload.type = 6; cleanPayload.clipboard = payload.clipboard; }
+
+            const message = InputEvent.create(cleanPayload);
+            const buffer = InputEvent.encode(message).finish();
+            ws.send(buffer);
+        }
+
+        async function sendKeySequence(seq) {
+            console.log("Sending Sequence:", seq);
+
+            if (seq === 'cad') {
+                // Ctrl + Alt + Delete (Full Sequence with Explicit Modifiers)
+                // Haiku Constants:
+                // B_CONTROL_KEY = 0x00000004
+                // B_COMMAND_KEY = 0x00000002 (Alt maps to Command on PC keymap)
+                // B_LEFT_CONTROL_KEY = 0x00001000
+                // B_LEFT_COMMAND_KEY = 0x00000400
+
+                // 1. Control Down
+                // Mods: Ctrl | LeftCtrl = 0x04 | 0x1000 = 0x1004
+                sendEvent({ key: { keyCode: 0, down: true, modifiers: 0x1004, keyUtf32: 0, keyString: 'ControlLeft' } });
+                await new Promise(r => setTimeout(r, 100));
+
+                // 2. Alt Down
+                // Mods: Ctrl | LeftCtrl | Cmd | LeftCmd = 0x1004 | 0x02 | 0x0400 = 0x1406
+                sendEvent({ key: { keyCode: 0, down: true, modifiers: 0x1406, keyUtf32: 0, keyString: 'AltLeft' } });
+                await new Promise(r => setTimeout(r, 100));
+
+                // 3. Delete Down
+                // Mods: 0x1406
+                sendEvent({ key: { keyCode: 0, down: true, modifiers: 0x1406, keyUtf32: 0, keyString: 'Delete' } });
+                await new Promise(r => setTimeout(r, 250)); // Hold longer
+
+                // 4. Delete Up
+                sendEvent({ key: { keyCode: 0, down: false, modifiers: 0x1406, keyUtf32: 0, keyString: 'Delete' } });
+                await new Promise(r => setTimeout(r, 100));
+
+                // 5. Alt Up -> Remaining: Ctrl
+                sendEvent({ key: { keyCode: 0, down: false, modifiers: 0x1004, keyUtf32: 0, keyString: 'AltLeft' } });
+                await new Promise(r => setTimeout(r, 100));
+
+                // 6. Control Up -> Remaining: 0
+                sendEvent({ key: { keyCode: 0, down: false, modifiers: 0, keyUtf32: 0, keyString: 'ControlLeft' } });
+
+            } else if (seq === 'printscreen') {
+                sendEvent({ key: { keyCode: 0, down: true, modifiers: 0, keyUtf32: 0, keyString: 'PrintScreen' } });
+                await new Promise(r => setTimeout(r, 100));
+                sendEvent({ key: { keyCode: 0, down: false, modifiers: 0, keyUtf32: 0, keyString: 'PrintScreen' } });
+            }
+        }
+
+        function sendResolution() {
+            // Send current window size (or canvas wrapper size?)
+            // Usually we want to match the browser window content area available
+            // But let's just send innerWidth/Height and let user fit it.
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            console.log("Requesting Resolution:", w, h);
+            sendEvent({ resolution: { width: w, height: h } });
+        }
+
+        let lastClipboardText = "";
+
+        // Check for Secure Context / Clipboard API support
+        async function checkClipboard() {
+            if (!document.hasFocus()) return;
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text && text !== lastClipboardText) {
+                    lastClipboardText = text;
+                    console.log("[Auto-Clip] Sending new text:", text.substring(0, 20) + "...");
+                    sendEvent({ clipboard: { text: text } });
+                }
+            } catch (e) {
+                // Ignore errors (e.g. not focused, permission denied)
+            }
+        }
+
+        // Poll regularly
+        setInterval(checkClipboard, 1500);
+
+        function sendCodecChange() {
+            const codec = document.getElementById('opt-codec').value;
+            console.log("Requesting Codec:", codec);
+            sendEvent({ codec: { codec: codec } });
+        }
+
+        let inputSetupDone = false;
+        function setupInput() {
+            if (inputSetupDone) return;
+            inputSetupDone = true;
+            let lastMouseX = 0;
+            let lastMouseY = 0;
+
+            // Mouse
+            const sendMouse = (e, type) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width;
+                const y = (e.clientY - rect.top) / rect.height;
+                lastMouseX = x;
+                lastMouseY = y;
+                sendEvent({ mouse: { x, y, buttons: e.buttons } });
+            };
+            canvas.addEventListener('mousemove', e => sendMouse(e, 'move'));
+            canvas.addEventListener('mousedown', e => sendMouse(e, 'down'));
+            canvas.addEventListener('mouseup', e => sendMouse(e, 'up'));
+            canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+            // Keyboard
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'f' || e.key === 'F') { // Only if not typing in inputs (none yet)
+                    // But sidebar might grab focus?
+                    // No inputs in sidebar yet.
+                }
+
+                if (e.repeat) return;
+                const charCode = e.key.length === 1 ? e.key.charCodeAt(0) : 0;
+                let modifiers = 0;
+                if (e.shiftKey) modifiers |= 0x0001;
+                if (e.ctrlKey) modifiers |= 0x0002;
+                sendEvent({ key: { keyCode: 0, down: true, modifiers: modifiers, keyUtf32: charCode, keyString: e.code } });
+            });
+
+            window.addEventListener('keyup', (e) => {
+                const charCode = e.key.length === 1 ? e.key.charCodeAt(0) : 0;
+                sendEvent({ key: { keyCode: 0, down: false, modifiers: 0, keyUtf32: charCode, keyString: e.code } });
+            });
+
+            // Scroll / Wheel
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                let dx = e.deltaX;
+                let dy = e.deltaY;
+
+                // Normalization
+                if (e.deltaMode === 0) { // Pixels
+                    dx /= 40;
+                    dy /= 40;
+                } else if (e.deltaMode === 2) { // Pages
+                    dx *= 10;
+                    dy *= 10;
+                }
+
+                // Invert for Haiku? Haiku: + is down/right. Browser: + is down/right.
+                // However, B_MOUSE_WHEEL_CHANGED often expects inverted for "natural" feeling?
+                // Standard Haiku is: +y = down (scrolls content up).
+
+                // Send current (last known) coordinates to hold position
+                // Lower threshold to capture subtle trackpad movements
+                if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+                    sendEvent({ mouse: { x: lastMouseX, y: lastMouseY, buttons: 0, wheelX: dx, wheelY: dy } });
+                }
+            }, { passive: false });
+        }
+
+        loadProto().then(() => {
+            connect();
+        }).catch(err => {
+            console.error("Failed to load Proto:", err);
+            elLoadingText.textContent = "Failed to load dependencies.";
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,37 @@
+
+name HaikuRemoteDesktop
+version 1.0.0-1
+architecture x86_64
+
+summary "Remote Control your Haiku system via Web Browser"
+description "Haiku Remote Desktop allows you to access and control your Haiku system from any device with a modern web browser.
+
+No client software installation is required! Just open the URL, accept the connection, and you're in.
+
+Key Features:
+- **Zero-Client**: Works in Chrome, Firefox, Safari, and more.
+- **High Performance**: Low-latency HD streaming using WebRTC (VP8/VP9).
+- **Full Control**: Complete mouse and keyboard integration.
+- **headless-friendly**: Use standard Haiku or run headless with virtual displays.
+- **Secure**: Encrypted HTTPS connections by default.
+
+Perfect for managing headless servers, accessing VMs, or remote troubleshooting."
+
+packager "Lionel Touati <ltouati@gmail.com>"
+vendor "HaikuRemote Project"
+
+copyrights "2025 Lionel Touati"
+licenses "MIT"
+
+provides {
+	HaikuRemoteDesktop = 1.0.0-1
+	app:ScreenServer = 1.0.0-1
+}
+
+requires {
+	haiku
+	lib:libssl
+	lib:libcrypto
+	lib:libprotobuf
+	lib:libvpx
+}
