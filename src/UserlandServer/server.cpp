@@ -95,7 +95,7 @@ public:
 		resume_thread(fNetworkThread);
 		
 		// Waiting for client...
-		printf("Screen Capture Server Running on http://0.0.0.0:8080 (Waiting for client)\n");
+		printf("Screen Capture Server Running on http://0.0.0.0:8443 (Waiting for client)\n");
 	}
 
 	virtual void MessageReceived(BMessage* msg) {
