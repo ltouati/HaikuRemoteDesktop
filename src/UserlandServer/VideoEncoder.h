@@ -10,6 +10,7 @@
 #include <smmintrin.h> // SSE4.1
 #include <immintrin.h> // AVX
 #include <String.h>
+#include <x264.h>
 
 class VideoEncoder {
 public:
@@ -28,15 +29,33 @@ public:
     void SetBitrate(int32 kbps);
 
     const char *GetCodecName() const;
+    
+    // H.264 Specific
+    bool GetExtraData(uint8 **data, size_t *size);
 
 private:
     vpx_codec_ctx_t fCodec;
     vpx_codec_enc_cfg_t fVpxCfg;
     vpx_image_t *fVpxImg;
+    
+    // H.264 State
+    x264_t *fX264Codec;
+    x264_param_t fX264Param;
+    x264_picture_t fX264PicIn;
+    x264_picture_t fX264PicOut;
+    x264_nal_t *fNals;
+    int fNalCount;
+    int fCurrentNal;
+    
+    // Wrapper to return X264 data as VPX packet to avoid changing server.cpp too much
+    vpx_codec_cx_pkt_t fFakePkt;
+
     bool fInitialized;
 
     // SIMD Color Conversion
     void _RGBToYUV420(const uint8 *rgb, int32 stride, vpx_image_t *img, const int width, const int height);
+    // Overload for x264 picture
+    void _RGBToYUV420_X264(const uint8 *rgb, int32 stride, x264_picture_t *pic, const int width, const int height);
 
     BString fCodecName;
 };

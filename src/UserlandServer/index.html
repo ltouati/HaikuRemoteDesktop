@@ -210,6 +210,7 @@
                         class="bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded px-2 py-1 outline-none focus:border-indigo-500 cursor-pointer">
                         <option value="vp8">VP8</option>
                         <option value="vp9">VP9</option>
+                        <option value="h264">H.264 (WebCodecs)</option>
                     </select>
                 </div>
             </div>
@@ -781,14 +782,56 @@
             });
         }
 
+        let decoder = null;
+
         function initMediaSource(codec) {
             console.log("Initializing Media Source with codec:", codec);
 
             serverCodec = codec;
             elCodec.textContent = codec.toUpperCase();
-            muxer = new WebMBuilder(width, height, codec);
-            canvas.width = width;
-            canvas.height = height;
+
+            // cleanup
+            if (decoder) {
+                decoder.close();
+                decoder = null;
+            }
+            if (sourceBuffer) {
+                try { mediaSource.removeSourceBuffer(sourceBuffer); } catch (e) { }
+                sourceBuffer = null;
+            }
+            queue = [];
+
+            if (codec === "h264") {
+                // WebCodecs Mode
+                if (!("VideoDecoder" in window)) {
+                    alert("H.264 requires a browser with WebCodecs support.");
+                    return;
+                }
+
+                canvas.width = window.width;
+                canvas.height = window.height;
+
+                decoder = new VideoDecoder({
+                    output: (frame) => {
+                        if (canvas.width > 0 && canvas.height > 0) {
+                            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+                            frameCounter++;
+                        }
+                        frame.close();
+                    },
+                    error: (e) => console.error("Decoder Error", e)
+                });
+
+                decoder.configure({
+                    codec: "avc1.42001E", // Baseline Profile Level 3.0
+                    optimizeForLatency: true
+                });
+                return;
+            }
+
+            muxer = new WebMBuilder(window.width, window.height, codec);
+            canvas.width = window.width;
+            canvas.height = window.height;
             queue = [];
 
             // Full Reset Strategy to avoid QuotaExceededError and InvalidStateError
@@ -850,6 +893,11 @@
                 updateStatusUI(true);
                 setupInput();
 
+                // Sync UI State
+                sendFpsChange();
+                sendCodecChange();
+                updateFit();
+
                 // Start Ping Loop
                 if (window.pingInterval) clearInterval(window.pingInterval);
                 window.pingInterval = setInterval(() => {
@@ -886,8 +934,6 @@
                         initMediaSource(config.codec || "vp8");
                     }
                 } else {
-                    if (!muxer || !sourceBuffer) return;
-
                     const raw = new Uint8Array(e.data);
                     window.byteCounter += raw.byteLength;
                     if (raw.length < 5) {
@@ -902,6 +948,27 @@
                     const flags = raw[0];
                     const packet = raw.subarray(1, raw.length - 4);
                     const isKey = (flags & 0x01) !== 0;
+
+                    // H.264 WebCodecs Path
+                    if (decoder) {
+                        if (frameCount === 0 && !isKey) return; // Wait for key
+                        frameCount++;
+                        if (startTime === 0) startTime = Date.now();
+                        let timecode = Math.floor(Date.now() - startTime);
+
+                        try {
+                            decoder.decode(new EncodedVideoChunk({
+                                type: isKey ? "key" : "delta",
+                                timestamp: timecode * 1000, // microseconds
+                                data: packet
+                            }));
+                        } catch (e) {
+                            console.error("Decode Error", e);
+                        }
+                        return;
+                    }
+
+                    if (!muxer || !sourceBuffer) return;
 
                     if (isKey && queue.length > 2) queue = [];
                     if (frameCount === 0 && !isKey) return;
@@ -1098,11 +1165,44 @@
         }
 
         loadProto().then(() => {
+            loadSettings();
             connect();
         }).catch(err => {
             console.error("Failed to load Proto:", err);
             elLoadingText.textContent = "Failed to load dependencies.";
         });
+
+        // --- Persistence ---
+        function saveSettings() {
+            localStorage.setItem('haiku_fps', document.getElementById('opt-fps').value);
+            localStorage.setItem('haiku_codec', document.getElementById('opt-codec').value);
+            localStorage.setItem('haiku_resize_remote', document.getElementById('opt-resize-remote').checked);
+            localStorage.setItem('haiku_scale_local', document.getElementById('opt-scale-local').checked);
+            localStorage.setItem('haiku_smooth', document.getElementById('opt-smooth').checked);
+        }
+
+        function loadSettings() {
+            if (localStorage.getItem('haiku_fps')) document.getElementById('opt-fps').value = localStorage.getItem('haiku_fps');
+            if (localStorage.getItem('haiku_codec')) document.getElementById('opt-codec').value = localStorage.getItem('haiku_codec');
+
+            if (localStorage.getItem('haiku_resize_remote') !== null) {
+                document.getElementById('opt-resize-remote').checked = (localStorage.getItem('haiku_resize_remote') === 'true');
+            }
+            if (localStorage.getItem('haiku_scale_local') !== null) {
+                document.getElementById('opt-scale-local').checked = (localStorage.getItem('haiku_scale_local') === 'true');
+            }
+            if (localStorage.getItem('haiku_smooth') !== null) {
+                document.getElementById('opt-smooth').checked = (localStorage.getItem('haiku_smooth') === 'true');
+                updateSmoothing(); // Apply immediately
+            }
+        }
+
+        // Attach listeners
+        document.getElementById('opt-fps').addEventListener('change', saveSettings);
+        document.getElementById('opt-codec').addEventListener('change', saveSettings);
+        document.getElementById('opt-resize-remote').addEventListener('change', saveSettings);
+        document.getElementById('opt-scale-local').addEventListener('change', saveSettings);
+        document.getElementById('opt-smooth').addEventListener('change', saveSettings);
     </script>
 </body>
 

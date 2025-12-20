@@ -27,6 +27,9 @@ find_package(OpenSSL REQUIRED)
 # Find LibVPX
 find_library(VPX_LIBRARY vpx REQUIRED)
 
+# Find X264
+find_library(X264_LIBRARY x264 REQUIRED)
+
 # Generate Sources
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS messages.proto)
 
@@ -90,6 +93,7 @@ target_link_libraries(screen_server
         network
         game
         ${VPX_LIBRARY}
+        ${X264_LIBRARY}
         ${Protobuf_LIBRARIES}
         OpenSSL::SSL
         OpenSSL::Crypto
