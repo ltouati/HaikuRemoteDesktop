@@ -36,6 +36,7 @@ message InputEvent {
         RESOLUTION = 4;
         CODEC = 5;
         CLIPBOARD = 6;
+        FPS = 7;
     }
 
     EventType type = 1;
@@ -46,6 +47,11 @@ message InputEvent {
     ResolutionEvent resolution = 5;
     CodecChangeEvent codec = 6;
     ClipboardEvent clipboard = 7;
+    FpsChangeEvent fps = 8;
+}
+
+message FpsChangeEvent {
+    int32 fps = 1;
 }
 
 message CodecChangeEvent {

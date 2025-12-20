@@ -67,6 +67,7 @@ add_executable(screen_server
         handlers/ResolutionPacketHandler.cpp
         handlers/CodecPacketHandler.cpp
         handlers/ClipboardPacketHandler.cpp
+        handlers/FpsPacketHandler.cpp
         handlers/PacketHandlerFactory.cpp
         messages.pb.cc
         ${CMAKE_CURRENT_BINARY_DIR}/messages.js

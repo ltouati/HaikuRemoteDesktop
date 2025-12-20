@@ -8,6 +8,7 @@
 #include "ResolutionPacketHandler.h"
 #include "CodecPacketHandler.h"
 #include "ClipboardPacketHandler.h"
+#include "FpsPacketHandler.h"
 
 PacketHandler *
 PacketHandlerFactory::GetHandler(haiku::remote::InputEvent::EventType type) {
@@ -31,6 +32,11 @@ PacketHandlerFactory::GetHandler(haiku::remote::InputEvent::EventType type) {
             return &codecHandler;
         case haiku::remote::InputEvent::CLIPBOARD:
             return &clipboardHandler;
+        case haiku::remote::InputEvent::FPS:
+        {
+            static FpsPacketHandler fpsHandler;
+            return &fpsHandler;
+        }
         default:
             return nullptr;
     }

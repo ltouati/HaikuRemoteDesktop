@@ -10,7 +10,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <fcntl.h>
 #include <errno.h>
+#include <netinet/tcp.h>
 #include <Path.h>
 #include <File.h>
 #include <Application.h>
@@ -105,6 +107,7 @@ NetworkServer::Start(uint16 port) {
 
     int opt = 1;
     setsockopt(fServerSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(fServerSocket, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
 
     // Non-blocking
     int flags = fcntl(fServerSocket, F_GETFL, 0);
@@ -348,6 +351,9 @@ NetworkServer::_HandleNewConnection() {
         // Set non-blocking before SSL
         int flags = fcntl(clientSocket, F_GETFL, 0);
         fcntl(clientSocket, F_SETFL, flags | O_NONBLOCK);
+        
+        int opt = 1;
+        setsockopt(clientSocket, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
 
         fLock.Lock();
         ClientState *client = new ClientState();

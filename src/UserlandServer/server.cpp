@@ -30,6 +30,8 @@ public:
         fNetworkServer = nullptr;
         fInputManager = new InputDriverManager();
         fCurrentCodec = "vp8";
+        fTargetFps = 30;
+        fFrameWaitTime = 33333; // ~30 FPS
         fCaptureSem = create_sem(0, "CaptureSignal");
     }
 
@@ -146,6 +148,13 @@ public:
             case MSG_WAKE_CAPTURE:
                 release_sem(fCaptureSem);
                 break;
+            case MSG_CHANGE_FPS: {
+                int32 fps;
+                if (msg->FindInt32("fps", &fps) == B_OK) {
+                    _ChangeFps(fps);
+                }
+                break;
+            }
             default:
                 BApplication::MessageReceived(msg);
         }
@@ -193,6 +202,8 @@ private:
     NetworkServer *fNetworkServer;
     InputDriverManager *fInputManager;
     BString fCurrentCodec;
+    int32 fTargetFps;
+    bigtime_t fFrameWaitTime;
 
     int fFrameCount;
     sem_id fCaptureSem;
@@ -266,14 +277,30 @@ private:
 
     status_t _CaptureLoop() {
         bigtime_t lastKeyframeTime = system_time();
+        bigtime_t nextFrameTime = system_time();
 
         while (fCapturing && !fTerminating) {
-            // Wait for signal or timeout (33ms = ~30fps baseline)
-            acquire_sem_etc(fCaptureSem, 1, B_RELATIVE_TIMEOUT, 33333);
+            // Absolute Timing Loop: Sleep only the remainder of the frame budget
+            bigtime_t now = system_time();
+            bigtime_t waitTime = nextFrameTime - now;
+
+            if (waitTime < 0) {
+                // We are late or just starting
+                waitTime = 0;
+                // If extremely late (e.g. paused/lag spike > 100ms), reset schedule
+                if (waitTime < -100000) nextFrameTime = now;
+            }
+
+            acquire_sem_etc(fCaptureSem, 1, B_RELATIVE_TIMEOUT, waitTime);
+            
+            // Advance schedule for next frame
+            nextFrameTime += fFrameWaitTime;
 
             int64 pts = fFrameCount++;
 
-            if (fScreenCapture->Capture(true) != B_OK) {
+            // Disable waitRetrace (false) to let fFrameWaitTime control the FPS.
+            // Otherwise, WaitForRetrace + acquire_sem delay caps us at ~30FPS on 60Hz systems.
+            if (fScreenCapture->Capture(false) != B_OK) {
                 snooze(10000); // Wait bit more if screen not ready
                 continue;
             }
@@ -284,7 +311,7 @@ private:
             }
 
             bool forceKeyframe = false;
-            bigtime_t now = system_time();
+            now = system_time();
             if (now - lastKeyframeTime > 60000000) forceKeyframe = true;
 
             // Zero Copy! Direct access to screen memory
@@ -333,6 +360,9 @@ private:
                     }
                 }
             }
+
+            // printf("Process Time: %ld us (Wait: %ld us)\n", endProcess - startProcess, waitTime);
+            // Only print if taking too long (> 10ms)
         }
         return B_OK;
     }
@@ -420,7 +450,18 @@ private:
         bool wasCapturing = fCapturing;
         if (wasCapturing) _StopCapture();
         if (wasCapturing) _StartCapture();
+        if (wasCapturing) _StartCapture();
         // If not capturing, it will be used next start
+    }
+
+    void _ChangeFps(int32 fps) {
+        if (fps < 1) fps = 1;
+        if (fps > 120) fps = 120;
+        
+        fTargetFps = fps;
+        fFrameWaitTime = 1000000 / fps; // microseconds per frame
+        
+        printf("FPS Changed to %d (WaitTime: %ld us)\n", fTargetFps, fFrameWaitTime);
     }
 
     void _Cleanup() {
