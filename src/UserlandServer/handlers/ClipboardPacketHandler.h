@@ -6,9 +6,10 @@
 
 #include "PacketHandler.h"
 
-class ClipboardPacketHandler : public PacketHandler {
+class ClipboardPacketHandler final : public PacketHandler {
 public:
-	virtual void Handle(NetworkServer* server, NetworkServer::ClientState* client, const haiku::remote::InputEvent& event);
+    void Handle(NetworkServer *server, NetworkServer::ClientState *client,
+                const haiku::remote::InputEvent &event) override;
 };
 
 #endif // CLIPBOARD_PACKET_HANDLER_H

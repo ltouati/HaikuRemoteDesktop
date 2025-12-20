@@ -6,9 +6,10 @@
 
 #include "PacketHandler.h"
 
-class CodecPacketHandler : public PacketHandler {
+class CodecPacketHandler final : public PacketHandler {
 public:
-	virtual void Handle(NetworkServer* server, NetworkServer::ClientState* client, const haiku::remote::InputEvent& event);
+    void Handle(NetworkServer *server, NetworkServer::ClientState *client,
+                const haiku::remote::InputEvent &event) override;
 };
 
 #endif // CODEC_PACKET_HANDLER_H

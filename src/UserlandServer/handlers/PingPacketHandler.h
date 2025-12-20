@@ -6,9 +6,10 @@
 
 #include "PacketHandler.h"
 
-class PingPacketHandler : public PacketHandler {
+class PingPacketHandler final : public PacketHandler {
 public:
-	virtual void Handle(NetworkServer* server, NetworkServer::ClientState* client, const haiku::remote::InputEvent& event);
+    void Handle(NetworkServer *server, NetworkServer::ClientState *client,
+                const haiku::remote::InputEvent &event) override;
 };
 
 #endif // PING_PACKET_HANDLER_H

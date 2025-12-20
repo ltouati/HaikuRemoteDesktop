@@ -9,17 +9,18 @@
 
 class InputDriverManager {
 public:
-	InputDriverManager();
-	~InputDriverManager();
+    InputDriverManager();
 
-	// Installs the driver (.so) and restarts input_server
-	status_t InstallDriver();
+    ~InputDriverManager();
 
-	// Removes the driver (.so) and restarts input_server
-	status_t UninstallDriver();
+    // Installs the driver (.so) and restarts input_server
+    status_t InstallDriver();
+
+    // Removes the driver (.so) and restarts input_server
+    status_t UninstallDriver();
 
 private:
-	status_t _RestartInputServer();
+    status_t _RestartInputServer();
 };
 
 #endif // INPUT_DRIVER_MANAGER_H

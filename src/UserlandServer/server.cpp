@@ -21,438 +21,467 @@
 
 class ScreenApp : public BApplication {
 public:
-	ScreenApp() : BApplication(APP_SIGNATURE) {
-		fArea = -1;
-		fNetworkThread = -1;
-		fCaptureThread = -1;
-		fTerminating = false;
-		fCapturing = false;
-		fRingBuffer = NULL;
-		fScreenCapture = new ScreenCapture();
-		fVideoEncoder = new VideoEncoder();
-		fNetworkServer = NULL;
-		fInputManager = new InputDriverManager();
-		fCurrentCodec = "vp8";
-	}
-	
-	~ScreenApp() {
-		delete fScreenCapture;
-		delete fVideoEncoder;
-		if (fNetworkServer) delete fNetworkServer;
-		delete fInputManager;
-	}
+    ScreenApp() : BApplication(APP_SIGNATURE) {
+        fArea = -1;
+        fNetworkThread = -1;
+        fCaptureThread = -1;
+        fTerminating = false;
+        fCapturing = false;
+        fRingBuffer = nullptr;
+        fScreenCapture = new ScreenCapture();
+        fVideoEncoder = new VideoEncoder();
+        fNetworkServer = nullptr;
+        fInputManager = new InputDriverManager();
+        fCurrentCodec = "vp8";
+        fCaptureSem = create_sem(0, "CaptureSignal");
+    }
 
-	virtual void ReadyToRun() {
-		status_t err = _InitResources();
-		if (err < B_OK) {
-			fprintf(stderr, "Failed to initialize resources: %s\n", strerror(err));
-			Quit();
-			return;
-		}
+    ~ScreenApp() {
+        if (fScreenCapture) {
+            delete fScreenCapture;
+        }
+        if (fVideoEncoder) {
+            delete fVideoEncoder;
+        }
+        if (fNetworkServer) {
+            delete fNetworkServer;
+        }
+        if (fInputManager) {
+            delete fInputManager;
+        }
+        delete_sem(fCaptureSem);
+    }
+
+    virtual void ReadyToRun() {
+        status_t err = _InitResources();
+        if (err < B_OK) {
+            fprintf(stderr, "Failed to initialize resources: %s\n", strerror(err));
+            Quit();
+            return;
+        }
 
 
-
-		// 1. Install Driver & Restart Input Server
+        // 1. Install Driver & Restart Input Server
 #ifndef RELEASE_MODE
-		fInputManager->InstallDriver();
-		
-		// Wait for Input Server to come up? InstallDriver snoozes 1s.
-		snooze(1000000); 
-#endif 
+        fInputManager->InstallDriver();
 
-		// 2. Start Network Server
-		// Retry finding port loop? Input Server might take a moment to create the port.
-		port_id inputPort = -1;
-		for (int i = 0; i < 20; i++) {
-			inputPort = find_port("virtual_mouse_input");
-			if (inputPort >= 0) break;
-			printf("Waiting for virtual_mouse_input port... (%d/20)\n", i + 1);
-			snooze(1000000);
-		}
-		
-		if (inputPort < B_OK) {
-			fprintf(stderr, "Warning: VirtualMouse input port not found after install.\n");
-		}
-
-		fNetworkServer = new NetworkServer(inputPort);
-		if (fNetworkServer->Start(8443) < B_OK) {
-			fprintf(stderr, "Failed to bind to port 8443\n");
-			Quit();
-			return;
-		}
-
-		fNetworkServer->SetTarget(BMessenger(this));
-
-		fNetworkThread = spawn_thread(_NetworkLoopSync, "Network Server",
-			B_NORMAL_PRIORITY, this);
-		
-		if (fNetworkThread < B_OK) {
-			fprintf(stderr, "Failed to spawn network thread\n");
-			Quit();
-			return;
-		}
-
-		resume_thread(fNetworkThread);
-		
-		// Waiting for client...
-		printf("Screen Capture Server Running on http://0.0.0.0:8443 (Waiting for client)\n");
-	}
-
-	virtual void MessageReceived(BMessage* msg) {
-		switch (msg->what) {
-			case MSG_CLIENTS_CONNECTED:
-				printf("Client Connected: Starting/Restarting Capture\n");
-				_StartCapture();
-				break;
-			case MSG_NO_CLIENTS:
-				printf("No Clients: Stopping Capture\n");
-				_StopCapture();
-				break;
-			case MSG_UPDATE_BITRATE: {
-				int32 bitrate;
-				if (msg->FindInt32("bitrate", &bitrate) == B_OK) {
-					if (fVideoEncoder) fVideoEncoder->SetBitrate(bitrate);
-				}
-				break;
-			}
-			case MSG_CHANGE_RESOLUTION: {
-				int32 width, height;
-				if (msg->FindInt32("width", &width) == B_OK && 
-					msg->FindInt32("height", &height) == B_OK) {
-					_ChangeResolution(width, height);
-				}
-				break;
-			}
-			case MSG_CHANGE_CODEC: {
-				BString codec;
-				if (msg->FindString("codec", &codec) == B_OK) {
-					_ChangeCodec(codec.String());
-				}
-				break;
-			}
-			case MSG_CLIPBOARD_EVENT: {
-				const char* text;
-				if (msg->FindString("text", &text) == B_OK) {
-					_HandleClipboard(text);
-				}
-				break;
-			}
-			default:
-				BApplication::MessageReceived(msg);
-		}
-	}
-
-	virtual bool QuitRequested() {
-		fTerminating = true;
-		
-		if (fNetworkServer) fNetworkServer->Stop();
-
-		status_t exitValue;
-		if (fNetworkThread > 0)
-			wait_for_thread(fNetworkThread, &exitValue);
-		
-		_StopCapture();
-		
-		_StopCapture();
-				
-		// Uninstall Driver (Optional? Or keep it for next time)
-#ifndef RELEASE_MODE
-		fInputManager->UninstallDriver();
+        // Wait for Input Server to come up? InstallDriver snoozes 1s.
+        snooze(1000000);
 #endif
 
-		_Cleanup();
-		return true;
-	}
+        // 2. Start Network Server
+        // Retry finding port loop? Input Server might take a moment to create the port.
+        port_id inputPort = -1;
+        for (int i = 0; i < 20; i++) {
+            inputPort = find_port("virtual_mouse_input");
+            if (inputPort >= 0) break;
+            printf("Waiting for virtual_mouse_input port... (%d/20)\n", i + 1);
+            snooze(1000000);
+        }
+
+        if (inputPort < B_OK) {
+            fprintf(stderr, "Warning: VirtualMouse input port not found after install.\n");
+        }
+
+        fNetworkServer = new NetworkServer(inputPort);
+        if (fNetworkServer->Start(8443) < B_OK) {
+            fprintf(stderr, "Failed to bind to port 8443\n");
+            Quit();
+            return;
+        }
+
+        fNetworkServer->SetTarget(BMessenger(this));
+
+        fNetworkThread = spawn_thread(_NetworkLoopSync, "Network Server",
+                                      B_NORMAL_PRIORITY, this);
+
+        if (fNetworkThread < B_OK) {
+            fprintf(stderr, "Failed to spawn network thread\n");
+            Quit();
+            return;
+        }
+
+        resume_thread(fNetworkThread);
+
+        // Waiting for client...
+        printf("Screen Capture Server Running on http://0.0.0.0:8443 (Waiting for client)\n");
+    }
+
+    virtual void MessageReceived(BMessage *msg) {
+        switch (msg->what) {
+            case MSG_CLIENTS_CONNECTED:
+                printf("Client Connected: Starting/Restarting Capture\n");
+                _StartCapture();
+                break;
+            case MSG_NO_CLIENTS:
+                printf("No Clients: Stopping Capture\n");
+                _StopCapture();
+                break;
+            case MSG_UPDATE_BITRATE: {
+                int32 bitrate;
+                if (msg->FindInt32("bitrate", &bitrate) == B_OK) {
+                    if (fVideoEncoder) fVideoEncoder->SetBitrate(bitrate);
+                }
+                break;
+            }
+            case MSG_CHANGE_RESOLUTION: {
+                int32 width, height;
+                if (msg->FindInt32("width", &width) == B_OK &&
+                    msg->FindInt32("height", &height) == B_OK) {
+                    _ChangeResolution(width, height);
+                }
+                break;
+            }
+            case MSG_CHANGE_CODEC: {
+                BString codec;
+                if (msg->FindString("codec", &codec) == B_OK) {
+                    _ChangeCodec(codec.String());
+                }
+                break;
+            }
+            case MSG_CLIPBOARD_EVENT: {
+                const char *text;
+                if (msg->FindString("text", &text) == B_OK) {
+                    _HandleClipboard(text);
+                }
+                break;
+            }
+            case MSG_WAKE_CAPTURE:
+                release_sem(fCaptureSem);
+                break;
+            default:
+                BApplication::MessageReceived(msg);
+        }
+    }
+
+    virtual bool QuitRequested() {
+        fTerminating = true;
+
+        if (fNetworkServer) {
+            fNetworkServer->Stop();
+        }
+
+        status_t exitValue;
+        if (fNetworkThread > 0) {
+            wait_for_thread(fNetworkThread, &exitValue);
+        }
+
+        _StopCapture();
+
+        if (fScreenCapture) {
+            if (fScreenCapture->Lock()) {
+                fScreenCapture->Quit();
+            }
+            fScreenCapture = nullptr;
+        }
+
+        // Uninstall Driver (Optional? Or keep it for next time)
+#ifndef RELEASE_MODE
+        fInputManager->UninstallDriver();
+#endif
+
+        _Cleanup();
+        return true;
+    }
 
 private:
-	area_id fArea;
-	
-	thread_id fNetworkThread;
-	thread_id fCaptureThread;
-	
-	volatile bool fTerminating;
-	volatile bool fCapturing;
-	
-	RingBuffer* fRingBuffer;
-	ScreenCapture* fScreenCapture;
-	VideoEncoder* fVideoEncoder;
-	NetworkServer* fNetworkServer;
-	InputDriverManager* fInputManager;
-	BString fCurrentCodec;
-	
-	int fFrameCount;
+    area_id fArea;
 
-	static status_t _NetworkLoopSync(void* data) {
-		return ((ScreenApp*)data)->_NetworkLoop();
-	}
+    thread_id fNetworkThread;
+    thread_id fCaptureThread;
 
-	static status_t _CaptureLoopSync(void* data) {
-		return ((ScreenApp*)data)->_CaptureLoop();
-	}
+    volatile bool fTerminating;
+    volatile bool fCapturing;
 
-	status_t _InitResources() {
-		// 1. Shared Memory Area (Still used for legacy/debugging or if we want RingBuffer)
-		// We actually don't Strictly need RingBuffer for direct broadcast anymore,
-		// but we kept it in refactor. We can keep it or remove it.
-		// Let's keep it for now as a bufferstage if needed, or just ignore it.
-		// We'll write to it just to be safe/consistent with logic.
-		void* addr = NULL;
-		size_t ringSize = (RING_BUFFER_SIZE + B_PAGE_SIZE - 1) & ~(B_PAGE_SIZE - 1);
-		fArea = create_area(AREA_NAME, &addr, B_ANY_ADDRESS, ringSize, 
-			B_FULL_LOCK, B_READ_AREA | B_WRITE_AREA | B_CLONEABLE_AREA);
-		
-		if (fArea < B_OK) return fArea;
-		
-		fRingBuffer = new RingBuffer(addr, ringSize);
-		return B_OK;
-	}
+    RingBuffer *fRingBuffer;
+    ScreenCapture *fScreenCapture;
+    VideoEncoder *fVideoEncoder;
+    NetworkServer *fNetworkServer;
+    InputDriverManager *fInputManager;
+    BString fCurrentCodec;
 
-	status_t _NetworkLoop() { 
-		while (!fTerminating && fNetworkServer) {
-			fNetworkServer->ProcessEvents();
-		}
-		return B_OK; 
-	}
+    int fFrameCount;
+    sem_id fCaptureSem;
 
-	void _StartCapture() {
-		_StopCapture();
-		
-		if (fScreenCapture->Init() != B_OK) {
-			fprintf(stderr, "Failed to init ScreenCapture\n");
-			return;
-		}
+    static status_t _NetworkLoopSync(void *data) {
+        return ((ScreenApp *) data)->_NetworkLoop();
+    }
 
-		if (fVideoEncoder->Init(fScreenCapture->Width(), fScreenCapture->Height(), 2000, fCurrentCodec.String()) != B_OK) {
-			fprintf(stderr, "Failed to init VideoEncoder\n");
-			return;
-		}
-		
-		fFrameCount = 0;
-		fCapturing = true;
+    static status_t _CaptureLoopSync(void *data) {
+        return ((ScreenApp *) data)->_CaptureLoop();
+    }
 
-		fCaptureThread = spawn_thread(_CaptureLoopSync, "Screen Capture",
-			B_DISPLAY_PRIORITY, this);
+    status_t _InitResources() {
+        // 1. Shared Memory Area (Still used for legacy/debugging or if we want RingBuffer)
+        // We actually don't Strictly need RingBuffer for direct broadcast anymore,
+        // but we kept it in refactor. We can keep it or remove it.
+        // Let's keep it for now as a bufferstage if needed, or just ignore it.
+        // We'll write to it just to be safe/consistent with logic.
+        void *addr = nullptr;
+        size_t ringSize = (RING_BUFFER_SIZE + B_PAGE_SIZE - 1) & ~(B_PAGE_SIZE - 1);
+        fArea = create_area(AREA_NAME, &addr, B_ANY_ADDRESS, ringSize,
+                            B_FULL_LOCK, B_READ_AREA | B_WRITE_AREA | B_CLONEABLE_AREA);
 
-		if (fCaptureThread >= B_OK) resume_thread(fCaptureThread);
-		else fCapturing = false;
+        if (fArea < B_OK) return fArea;
 
-		// Send Init Config to Client
-		BString config;
-		config << "{\"type\": \"init\", \"width\": " << fScreenCapture->Width() 
-		       << ", \"height\": " << fScreenCapture->Height() 
-		       << ", \"codec\": \"" << fVideoEncoder->GetCodecName() << "\"}";
-		
-		uint8 headerBuf[16];
-		size_t headerLen = NetworkUtils::MakeWebSocketHeader(config.Length(), headerBuf, 0x01); // 0x01 = Text
+        fRingBuffer = new RingBuffer(addr, ringSize);
+        return B_OK;
+    }
+
+    status_t _NetworkLoop() {
+        while (!fTerminating && fNetworkServer) {
+            fNetworkServer->ProcessEvents();
+        }
+        return B_OK;
+    }
+
+    void _StartCapture() {
+        _StopCapture();
+
+        if (fScreenCapture->Init() != B_OK) {
+            fprintf(stderr, "Failed to init ScreenCapture\n");
+            return;
+        }
+
+        fNetworkServer->SetScreenCapture(fScreenCapture);
+
+        if (fVideoEncoder->Init(fScreenCapture->Width(), fScreenCapture->Height(), 2000, fCurrentCodec.String()) !=
+            B_OK) {
+            fprintf(stderr, "Failed to init VideoEncoder\n");
+            return;
+        }
+
+        fFrameCount = 0;
+        fCapturing = true;
+
+        fCaptureThread = spawn_thread(_CaptureLoopSync, "Screen Capture",
+                                      B_DISPLAY_PRIORITY, this);
+
+        if (fCaptureThread >= B_OK) resume_thread(fCaptureThread);
+        else fCapturing = false;
+
+        // Send Init Config to Client
+        BString config;
+        config << "{\"type\": \"init\", \"width\": " << fScreenCapture->Width()
+                << ", \"height\": " << fScreenCapture->Height()
+                << ", \"codec\": \"" << fVideoEncoder->GetCodecName() << "\"}";
+
+        uint8 headerBuf[16];
+        size_t headerLen = NetworkUtils::MakeWebSocketHeader(config.Length(), headerBuf, 0x01); // 0x01 = Text
 
 
-		fNetworkServer->Broadcast(headerBuf, headerLen, config.String(), config.Length());
-		fNetworkServer->SetWelcomeMessage(config.String(), config.Length());
-	}
+        fNetworkServer->Broadcast(headerBuf, headerLen, config.String(), config.Length());
+        fNetworkServer->SetWelcomeMessage(config.String(), config.Length());
+    }
 
-	void _StopCapture() {
-		fCapturing = false;
-		if (fCaptureThread > 0) {
-			status_t exitVal;
-			wait_for_thread(fCaptureThread, &exitVal);
-			fCaptureThread = -1;
-		}
-	}
+    void _StopCapture() {
+        fCapturing = false;
+        if (fCaptureThread > 0) {
+            status_t exitVal;
+            wait_for_thread(fCaptureThread, &exitVal);
+            fCaptureThread = -1;
+        }
+    }
 
-	status_t _CaptureLoop() {
-		bigtime_t lastKeyframeTime = system_time();
-		
-		while (fCapturing && !fTerminating) {
-			int64 pts = fFrameCount++; 
+    status_t _CaptureLoop() {
+        bigtime_t lastKeyframeTime = system_time();
 
-			if (fScreenCapture->Capture(true) != B_OK) {
-				continue;
-			}
+        while (fCapturing && !fTerminating) {
+            // Wait for signal or timeout (33ms = ~30fps baseline)
+            acquire_sem_etc(fCaptureSem, 1, B_RELATIVE_TIMEOUT, 33333);
 
-			bool forceKeyframe = false;
-			bigtime_t now = system_time();
-			if (now - lastKeyframeTime > 60000000) forceKeyframe = true;
+            int64 pts = fFrameCount++;
 
-			
-			if (fVideoEncoder->Encode(fScreenCapture->GetBitmap(), pts, forceKeyframe) == B_OK) {
-				
-				vpx_codec_iter_t iter = NULL;
-				const vpx_codec_cx_pkt_t* pkt = NULL;
-				
-				while ((pkt = fVideoEncoder->GetNextPacket(&iter)) != NULL) {
-					if (pkt->kind == VPX_CODEC_CX_FRAME_PKT) {
-						bool isKey = (pkt->data.frame.flags & VPX_FRAME_IS_KEY);
-						if (isKey) lastKeyframeTime = system_time();
+            if (fScreenCapture->Capture(true) != B_OK) {
+                snooze(10000); // Wait bit more if screen not ready
+                continue;
+            }
 
-						// Construct Payload: [Meta(1)] + [Frame(N)] + [Magic(4)]
-						// Construct Payload: [Meta(1)] + [Frame(N)] + [Magic(4)]
-						size_t frameSz = pkt->data.frame.sz;
-						size_t payloadSz = 1 + frameSz + 4;
-						
-						// Construct WebSocket Header
-						uint8 headerBuf[16];
-						size_t headerLen = NetworkUtils::MakeWebSocketHeader(payloadSz, headerBuf, 0x02); // Binary
-						
-						// Prepare Data Chunks (Scatter/Gather)
-						uint8 metaByte = isKey ? 0x01 : 0x00;
-						static const uint8 magicBytes[] = {0xDE, 0xAD, 0xBE, 0xEF};
-						
-						struct iovec vec[4];
-						
-						// 1. WebSocket Frame Header
-						vec[0].iov_base = headerBuf;
-						vec[0].iov_len = headerLen;
-						
-						// 2. Meta
-						vec[1].iov_base = &metaByte;
-						vec[1].iov_len = 1;
-						
-						// 3. VP8 Frame (Zero Copy!)
-						vec[2].iov_base = pkt->data.frame.buf;
-						vec[2].iov_len = frameSz;
-						
-						// 4. Magic
-						vec[3].iov_base = (void*)magicBytes;
-						vec[3].iov_len = 4;
-						
-						// Broadcast
-						fNetworkServer->Broadcast(vec, 4);
-					}
-				}
-			}
+            if (!fScreenCapture->IsConnected()) {
+                snooze(10000);
+                continue;
+            }
 
-			fScreenCapture->SwapBuffers();
-		}
-		return B_OK;
-	}
+            bool forceKeyframe = false;
+            bigtime_t now = system_time();
+            if (now - lastKeyframeTime > 60000000) forceKeyframe = true;
 
-	void _ChangeResolution(int32 width, int32 height) {
-		printf("Resolution Change Requested: %ldx%ld\n", width, height);
+            // Zero Copy! Direct access to screen memory
+            if (fVideoEncoder->Encode(fScreenCapture->GetScreenBits(), fScreenCapture->GetRowBytes(), pts,
+                                      forceKeyframe) == B_OK) {
+                vpx_codec_iter_t iter = nullptr;
+                const vpx_codec_cx_pkt_t *pkt = nullptr;
 
-		BScreen screen(B_MAIN_SCREEN_ID);
-		if (!screen.IsValid()) {
-			fprintf(stderr, "BScreen is invalid\n");
-			return;
-		}
+                while ((pkt = fVideoEncoder->GetNextPacket(&iter)) != nullptr) {
+                    if (pkt->kind == VPX_CODEC_CX_FRAME_PKT) {
+                        bool isKey = (pkt->data.frame.flags & VPX_FRAME_IS_KEY);
+                        if (isKey) lastKeyframeTime = system_time();
 
-		display_mode* modeList = NULL;
-		display_mode targetMode;
-		display_mode currentMode;
+                        // Construct Payload: [Meta(1)] + [Frame(N)] + [Magic(4)]
+                        size_t frameSz = pkt->data.frame.sz;
+                        size_t payloadSz = 1 + frameSz + 4;
 
-		screen.GetMode(&currentMode);
+                        // Construct WebSocket Header
+                        uint8 headerBuf[16];
+                        size_t headerLen = NetworkUtils::MakeWebSocketHeader(payloadSz, headerBuf, 0x02); // Binary
 
-		uint32 count = 0;
-		if (screen.GetModeList(&modeList, &count) != B_OK) {
-			fprintf(stderr, "Failed to get mode list\n");
-			return;
-		}
+                        // Prepare Data Chunks (Scatter/Gather)
+                        uint8 metaByte = isKey ? 0x01 : 0x00;
+                        static const uint8 magicBytes[] = {0xDE, 0xAD, 0xBE, 0xEF};
 
-		// Find closest mode
-		int32 bestDiff = 0x7FFFFFFF;
-		int32 bestIndex = -1;
+                        struct iovec vec[4];
 
-		for (uint32 i = 0; i < count; i++) {
-			int32 w = modeList[i].virtual_width;
-			int32 h = modeList[i].virtual_height;
+                        // 1. WebSocket Frame Header
+                        vec[0].iov_base = headerBuf;
+                        vec[0].iov_len = headerLen;
 
-			// Exact Match?
-			if (w == width && h == height) {
-				bestIndex = i;
-				break;
-			}
+                        // 2. Meta
+                        vec[1].iov_base = &metaByte;
+                        vec[1].iov_len = 1;
 
-			// Closest by area or distance? Let's do simple pixel difference sum
-			long diff = abs(w - width) + abs(h - height);
-			
-			if (diff < bestDiff) {
-				bestDiff = diff;
-				bestIndex = i;
-			}
-		}
+                        // 3. Video Frame (Zero Copy from Encoder output)
+                        vec[2].iov_base = pkt->data.frame.buf;
+                        vec[2].iov_len = frameSz;
 
-		if (bestIndex >= 0) {
-			targetMode = modeList[bestIndex];
-		}
-		
-		delete[] modeList;
+                        // 4. Magic
+                        vec[3].iov_base = (void *) magicBytes;
+                        vec[3].iov_len = 4;
 
-		if (bestIndex >= 0) {
-			printf("Switching to closest mode: %dx%d\n", 
-				targetMode.virtual_width, targetMode.virtual_height);
-			
-			if (targetMode.virtual_width == currentMode.virtual_width && 
-				targetMode.virtual_height == currentMode.virtual_height) {
-				printf("Already in requested mode.\n");
-				return;
-			}
+                        // Broadcast
+                        fNetworkServer->Broadcast(vec, 4);
+                    }
+                }
+            }
+        }
+        return B_OK;
+    }
 
-			// Stop Capture First
-			bool wasCapturing = fCapturing;
-			if (wasCapturing) _StopCapture();
+    void _ChangeResolution(int32 width, int32 height) {
+        printf("Resolution Change Requested: %ldx%ld\n", width, height);
 
-			screen.SetMode(&targetMode);
-			
-			// Give it a moment to settle
-			snooze(200000);
+        BScreen screen(B_MAIN_SCREEN_ID);
+        if (!screen.IsValid()) {
+            fprintf(stderr, "BScreen is invalid\n");
+            return;
+        }
 
-			if (wasCapturing) _StartCapture();
-		} else {
-			fprintf(stderr, "No suitable mode found\n");
-		}
-	}
+        display_mode *modeList = nullptr;
+        display_mode targetMode;
+        display_mode currentMode;
 
-	void _ChangeCodec(const char* codec) {
-		printf("Codec Change Requested: %s\n", codec);
-		if (fCurrentCodec == codec) return;
-		fCurrentCodec = codec;
-		// Restart Capture
-		bool wasCapturing = fCapturing;
-		if (wasCapturing) _StopCapture();
-		if (wasCapturing) _StartCapture();
-		// If not capturing, it will be used next start
-	}
+        screen.GetMode(&currentMode);
 
-	void _Cleanup() {
-		if (fRingBuffer) delete fRingBuffer;
-		if (fArea >= 0) delete_area(fArea);
-	}
+        uint32 count = 0;
+        if (screen.GetModeList(&modeList, &count) != B_OK) {
+            fprintf(stderr, "Failed to get mode list\n");
+            return;
+        }
 
-	void _HandleClipboard(const char* text) {
-		if (!text) return;
-		
-		printf("[Server] Handling Clipboard Update: '%s'\n", text);
+        // Find closest mode
+        int32 bestDiff = 0x7FFFFFFF;
+        int32 bestIndex = -1;
 
-		BClipboard clipboard("system");
-		if (clipboard.Lock()) {
-			clipboard.Clear();
-			BMessage* clipMsg = clipboard.Data();
-			if (clipMsg) {
-				clipMsg->AddData("text/plain", B_MIME_TYPE, text, strlen(text));
-				status_t ignore = clipboard.Commit();
-				printf("[Server] Clipboard Commit Result: %s\n", strerror(ignore));
-			} else {
-				printf("[Server] Error: Could not get clipboard data container\n");
-			}
-			clipboard.Unlock();
-			printf("[Server] Clipboard updated: %s\n", text);
-		} else {
-			printf("[Server] Error: Failed to lock clipboard\n");
-		}
-	}
+        for (uint32 i = 0; i < count; i++) {
+            int32 w = modeList[i].virtual_width;
+            int32 h = modeList[i].virtual_height;
 
+            // Exact Match?
+            if (w == width && h == height) {
+                bestIndex = i;
+                break;
+            }
+
+            // Closest by area or distance? Let's do simple pixel difference sum
+            long diff = abs(w - width) + abs(h - height);
+
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestIndex = i;
+            }
+        }
+
+        if (bestIndex >= 0) {
+            targetMode = modeList[bestIndex];
+        }
+
+        delete[] modeList;
+
+        if (bestIndex >= 0) {
+            printf("Switching to closest mode: %dx%d\n",
+                   targetMode.virtual_width, targetMode.virtual_height);
+
+            if (targetMode.virtual_width == currentMode.virtual_width &&
+                targetMode.virtual_height == currentMode.virtual_height) {
+                printf("Already in requested mode.\n");
+                return;
+            }
+
+            // Stop Capture First
+            bool wasCapturing = fCapturing;
+            if (wasCapturing) _StopCapture();
+
+            screen.SetMode(&targetMode);
+
+            // Give it a moment to settle
+            snooze(200000);
+
+            if (wasCapturing) _StartCapture();
+        } else {
+            fprintf(stderr, "No suitable mode found\n");
+        }
+    }
+
+    void _ChangeCodec(const char *codec) {
+        printf("Codec Change Requested: %s\n", codec);
+        if (fCurrentCodec == codec) return;
+        fCurrentCodec = codec;
+        // Restart Capture
+        bool wasCapturing = fCapturing;
+        if (wasCapturing) _StopCapture();
+        if (wasCapturing) _StartCapture();
+        // If not capturing, it will be used next start
+    }
+
+    void _Cleanup() {
+        if (fRingBuffer) delete fRingBuffer;
+        if (fArea >= 0) delete_area(fArea);
+    }
+
+    void _HandleClipboard(const char *text) {
+        if (!text) return;
+
+        printf("[Server] Handling Clipboard Update: '%s'\n", text);
+
+        BClipboard clipboard("system");
+        if (clipboard.Lock()) {
+            clipboard.Clear();
+            BMessage *clipMsg = clipboard.Data();
+            if (clipMsg) {
+                clipMsg->AddData("text/plain", B_MIME_TYPE, text, strlen(text));
+                status_t ignore = clipboard.Commit();
+                printf("[Server] Clipboard Commit Result: %s\n", strerror(ignore));
+            } else {
+                printf("[Server] Error: Could not get clipboard data container\n");
+            }
+            clipboard.Unlock();
+            printf("[Server] Clipboard updated: %s\n", text);
+        } else {
+            printf("[Server] Error: Failed to lock clipboard\n");
+        }
+    }
 };
 
 void signal_handler(int sig) {
-	printf("\nCaught signal %d, quitting...\n", sig);
-	if (be_app) be_app->PostMessage(B_QUIT_REQUESTED);
+    printf("\nCaught signal %d, quitting...\n", sig);
+    if (be_app) be_app->PostMessage(B_QUIT_REQUESTED);
 }
 
 int main() {
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
-	
-	rename_thread(find_thread(NULL), "Screen Server");
-	ScreenApp app;
-	app.Run();
-	return 0;
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+
+    rename_thread(find_thread(nullptr), "Screen Server");
+    ScreenApp app;
+    app.Run();
+    return 0;
 }

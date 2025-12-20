@@ -11,8 +11,11 @@
 
 class PacketHandler {
 public:
-	virtual ~PacketHandler() {}
-	virtual void Handle(NetworkServer* server, NetworkServer::ClientState* client, const haiku::remote::InputEvent& event) = 0;
+    virtual ~PacketHandler() {
+    }
+
+    virtual void Handle(NetworkServer *server, NetworkServer::ClientState *client,
+                        const haiku::remote::InputEvent &event) = 0;
 };
 
 #endif // PACKET_HANDLER_H

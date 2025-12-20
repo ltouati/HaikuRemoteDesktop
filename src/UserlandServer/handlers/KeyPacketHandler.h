@@ -8,18 +8,22 @@
 #include <map>
 #include <string>
 
-class KeyPacketHandler : public PacketHandler {
+class KeyPacketHandler final : public PacketHandler {
 public:
-	KeyPacketHandler();
-	virtual void Handle(NetworkServer* server, NetworkServer::ClientState* client, const haiku::remote::InputEvent& event);
+    KeyPacketHandler();
+
+    void Handle(NetworkServer *server, NetworkServer::ClientState *client,
+                const haiku::remote::InputEvent &event) override;
 
 private:
-	struct KeyInfo {
-		uint32 scancode;
-		uint32 charcode;
-	};
-	std::map<std::string, KeyInfo> fKeyMap;
-	void _InitKeyMap();
+    struct KeyInfo {
+        uint32 scancode;
+        uint32 charcode;
+    };
+
+    std::map<std::string, KeyInfo> fKeyMap;
+
+    void _InitKeyMap();
 };
 
 #endif // KEY_PACKET_HANDLER_H

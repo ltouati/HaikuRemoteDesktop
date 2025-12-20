@@ -6,9 +6,10 @@
 
 #include "PacketHandler.h"
 
-class ResolutionPacketHandler : public PacketHandler {
+class ResolutionPacketHandler final : public PacketHandler {
 public:
-	virtual void Handle(NetworkServer* server, NetworkServer::ClientState* client, const haiku::remote::InputEvent& event);
+    void Handle(NetworkServer *server, NetworkServer::ClientState *client,
+                const haiku::remote::InputEvent &event) override;
 };
 
 #endif // RESOLUTION_PACKET_HANDLER_H

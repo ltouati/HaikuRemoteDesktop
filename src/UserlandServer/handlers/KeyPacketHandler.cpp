@@ -13,72 +13,69 @@
 
 // static const char* kInputServerSignature = ...;
 
-KeyPacketHandler::KeyPacketHandler() 
-{
-	_InitKeyMap();
+KeyPacketHandler::KeyPacketHandler() {
+    _InitKeyMap();
 }
 
-void 
-KeyPacketHandler::Handle(NetworkServer* server, NetworkServer::ClientState* client, const haiku::remote::InputEvent& event) 
-{
-	if (!event.has_key()) return;
+void
+KeyPacketHandler::Handle(NetworkServer *server, NetworkServer::ClientState *client,
+                         const haiku::remote::InputEvent &event) {
+    if (!event.has_key()) return;
 
-	const haiku::remote::KeyEvent& key = event.key();
-	
-	input_packet driverEvent;
-	memset(&driverEvent, 0, sizeof(driverEvent));
-	
-	driverEvent.type = PACKET_KEY;
-	driverEvent.data.key.down = key.down();
-	driverEvent.data.key.modifiers = key.modifiers();
-	driverEvent.data.key.key_utf32 = key.key_utf32();
-	
-	// Use Corrected Map
-	uint32_t keyCode = key.key_code();
-	uint32_t charCode = key.key_utf32();
+    const haiku::remote::KeyEvent &key = event.key();
 
-	if (keyCode == 0 && !key.key_string().empty()) {
-		std::string code = key.key_string();
-		if (fKeyMap.find(code) != fKeyMap.end()) {
-			KeyInfo info = fKeyMap[code];
-			keyCode = info.scancode;
-			if (charCode == 0) charCode = info.charcode;
-		} else {
-             // Unknown Key
-		}
-	}
-	
-	driverEvent.data.key.key_code = keyCode;
-	driverEvent.data.key.key_utf32 = charCode;
+    input_packet driverEvent;
+    memset(&driverEvent, 0, sizeof(driverEvent));
+
+    driverEvent.type = PACKET_KEY;
+    driverEvent.data.key.down = key.down();
+    driverEvent.data.key.modifiers = key.modifiers();
+    driverEvent.data.key.key_utf32 = key.key_utf32();
+
+    // Use Corrected Map
+    uint32_t keyCode = key.key_code();
+    uint32_t charCode = key.key_utf32();
+
+    if (keyCode == 0 && !key.key_string().empty()) {
+        std::string code = key.key_string();
+        if (fKeyMap.find(code) != fKeyMap.end()) {
+            KeyInfo info = fKeyMap[code];
+            keyCode = info.scancode;
+            if (charCode == 0) charCode = info.charcode;
+        } else {
+            // Unknown Key
+        }
+    }
+
+    driverEvent.data.key.key_code = keyCode;
+    driverEvent.data.key.key_utf32 = charCode;
 
 
-
-	port_id inputPort = server->GetInputPort();
-	if (inputPort >= 0) write_port(inputPort, 0, &driverEvent, sizeof(driverEvent));
+    port_id inputPort = server->GetInputPort();
+    if (inputPort >= 0) write_port(inputPort, 0, &driverEvent, sizeof(driverEvent));
 }
 
-void 
-KeyPacketHandler::_InitKeyMap() 
-{
-	// Common Keys
+void
+KeyPacketHandler::_InitKeyMap() {
+    // Common Keys
 
-	
-	// F-Keys
-	fKeyMap["F1"] = {0x02, 0};
-	fKeyMap["F2"] = {0x03, 0};
-	fKeyMap["F3"] = {0x04, 0};
-	fKeyMap["F4"] = {0x05, 0};
-	fKeyMap["F5"] = {0x06, 0};
-	fKeyMap["F6"] = {0x07, 0};
-	fKeyMap["F7"] = {0x08, 0};
-	fKeyMap["F8"] = {0x09, 0};
-	fKeyMap["F9"] = {0x0A, 0};
-	fKeyMap["F10"] = {0x0B, 0};
-	fKeyMap["F11"] = {0x0C, 0};
-	fKeyMap["F12"] = {0x0D, 0};
+
+    // F-Keys
+    fKeyMap["F1"] = {0x02, 0};
+    fKeyMap["F2"] = {0x03, 0};
+    fKeyMap["F3"] = {0x04, 0};
+    fKeyMap["F4"] = {0x05, 0};
+    fKeyMap["F5"] = {0x06, 0};
+    fKeyMap["F6"] = {0x07, 0};
+    fKeyMap["F7"] = {0x08, 0};
+    fKeyMap["F8"] = {0x09, 0};
+    fKeyMap["F9"] = {0x0A, 0};
+    fKeyMap["F10"] = {0x0B, 0};
+    fKeyMap["F11"] = {0x0C, 0};
+    fKeyMap["F12"] = {0x0D, 0};
 
     // Modifiers
-	// Modifiers
+    // Modifiers
     fKeyMap["ShiftLeft"] = {0x4B, 0};
     fKeyMap["ShiftRight"] = {0x56, 0};
     fKeyMap["ControlLeft"] = {0x5C, 0};
@@ -88,7 +85,7 @@ KeyPacketHandler::_InitKeyMap()
     fKeyMap["MetaLeft"] = {0x66, 0};
     fKeyMap["MetaRight"] = {0x67, 0};
 
-	// Numbers Row
+    // Numbers Row
     // Tilde=0x11, 1=0x12 ... 0=0x1b, -=0x1c, ==0x1d, Backspace=0x1e
     fKeyMap["Backquote"] = {0x11, '`'};
     fKeyMap["Key1"] = {0x12, '1'};
@@ -150,25 +147,25 @@ KeyPacketHandler::_InitKeyMap()
     fKeyMap["Comma"] = {0x53, ','};
     fKeyMap["Period"] = {0x54, '.'};
     fKeyMap["Slash"] = {0x55, '/'};
-    
+
     // Bottom Row
     fKeyMap["Space"] = {0x5e, 0x20};
 
-	// Arrows
-	fKeyMap["ArrowLeft"] = {0x61, 0x1c};
-	fKeyMap["ArrowDown"] = {0x62, 0x1f};
-	fKeyMap["ArrowRight"] = {0x63, 0x1d};
-	fKeyMap["ArrowUp"] = {0x57, 0x1e};
-	
-	// Navigation
-	fKeyMap["Insert"] = {0x1F, 0x05}; // Check 0x1f collision? 0x1f is usually Key 6 on numpad or similar?
+    // Arrows
+    fKeyMap["ArrowLeft"] = {0x61, 0x1c};
+    fKeyMap["ArrowDown"] = {0x62, 0x1f};
+    fKeyMap["ArrowRight"] = {0x63, 0x1d};
+    fKeyMap["ArrowUp"] = {0x57, 0x1e};
+
+    // Navigation
+    fKeyMap["Insert"] = {0x1F, 0x05}; // Check 0x1f collision? 0x1f is usually Key 6 on numpad or similar?
     // BeBook says:
     // Insert=0x1f, Home=0x20, PgUp=0x21, Delete=0x34, End=0x35, PgDn=0x36
     // ArrowUp=0x57, ArrowLeft=0x61, ArrowDown=0x62, ArrowRight=0x63
-	fKeyMap["Insert"] = {0x1F, 0x05};
-	fKeyMap["Delete"] = {0x34, 0x7f};
-	fKeyMap["Home"] = {0x20, 0x01};
-	fKeyMap["End"] = {0x35, 0x04};
-	fKeyMap["PageUp"] = {0x21, 0x0b};
-	fKeyMap["PageDown"] = {0x36, 0x0c};
+    fKeyMap["Insert"] = {0x1F, 0x05};
+    fKeyMap["Delete"] = {0x34, 0x7f};
+    fKeyMap["Home"] = {0x20, 0x01};
+    fKeyMap["End"] = {0x35, 0x04};
+    fKeyMap["PageUp"] = {0x21, 0x0b};
+    fKeyMap["PageDown"] = {0x36, 0x0c};
 }

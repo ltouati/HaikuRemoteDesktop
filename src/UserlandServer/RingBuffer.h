@@ -9,18 +9,19 @@
 
 class RingBuffer {
 public:
-	RingBuffer(void* buffer, size_t size);
-	~RingBuffer();
+    RingBuffer(void *buffer, const size_t size);
 
-	// returns offset where data was written
-	int32 Write(const void* data, size_t len);
-	
-	size_t Size() const { return fSize; }
+    ~RingBuffer();
+
+    // returns offset where data was written
+    int32 Write(const void *data, size_t len);
+
+    size_t Size() const { return fSize; }
 
 private:
-	uint8* fBuffer;
-	size_t fSize;
-	volatile int32 fHead;
+    uint8 *fBuffer;
+    size_t fSize;
+    volatile int32 fHead;
 };
 
 #endif // RING_BUFFER_H

@@ -6,9 +6,10 @@
 
 #include "PacketHandler.h"
 
-class MousePacketHandler : public PacketHandler {
+class MousePacketHandler final : public PacketHandler {
 public:
-	virtual void Handle(NetworkServer* server, NetworkServer::ClientState* client, const haiku::remote::InputEvent& event);
+    void Handle(NetworkServer *server, NetworkServer::ClientState *client,
+                const haiku::remote::InputEvent &event) override;
 };
 
 #endif // MOUSE_PACKET_HANDLER_H
