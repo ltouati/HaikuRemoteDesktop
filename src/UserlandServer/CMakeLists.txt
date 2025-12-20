@@ -55,7 +55,6 @@ endif ()
 add_executable(screen_server
         ${SCREEN_SERVER_SOURCES}
         server.cpp
-        RingBuffer.cpp
         ScreenCapture.cpp
         VideoEncoder.cpp
         NetworkServer.cpp

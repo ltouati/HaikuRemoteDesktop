@@ -7,11 +7,13 @@
 #include <InterfaceDefs.h>
 #include <WindowScreen.h>
 
+    // 1x1 Transparent Spy Window at (0,0)
 ScreenCapture::ScreenCapture()
-    : BDirectWindow(BRect(-10, -10, -9, -9), "ScreenCapture", B_NO_BORDER_WINDOW_LOOK, B_FLOATING_ALL_WINDOW_FEEL,
+    : BDirectWindow(BRect(0, 0, 0, 0), "ScreenCapture", B_NO_BORDER_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL,
                     B_NOT_MOVABLE | B_NOT_RESIZABLE | B_AVOID_FOCUS | B_AVOID_FRONT | B_NOT_ANCHORED_ON_ACTIVATE),
       fLock("ScreenCaptureLock"), fScreenBits(nullptr), fRowBytes(0), fWidth(0), fHeight(0) {
-    fCaptureView = new BView(BRect(0, 0, 1, 1), "CursorTrackingView", B_FOLLOW_NONE, 0);
+    fCaptureView = new BView(BRect(0, 0, 0, 0), "CursorTrackingView", B_FOLLOW_NONE, 0);
+    fCaptureView->SetViewColor(B_TRANSPARENT_COLOR);
     AddChild(fCaptureView);
 }
 
@@ -27,10 +29,16 @@ ScreenCapture::Init() {
     fWidth = (int32) frame.IntegerWidth() + 1;
     fHeight = (int32) frame.IntegerHeight() + 1;
 
-    // Keep it 1x1 and off-screen. 
-    // As long as it's "Show()", we should get DirectConnected updates.
+    // Strategy: 1x1 Transparent Window at Top-Left
+    // We need to be "on screen" to get DirectConnected, but we want to be invisible.
+    // Fullscreen window caused visual obstruction. 1x1 should be negligible.
+    MoveTo(0, 0);
+    ResizeTo(0, 0); // 1x1 (width/height is size-1 in Haiku Rect?) No, resize to width/height. 0,0 is 1px?
+    // BRect(0,0,0,0) is 1 pixel wide/high (0 to 0 inclusive).
+    
     Show();
-
+    SendBehind(nullptr); 
+    
     return B_OK;
 }
 

@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <signal.h>
 
-#include "RingBuffer.h"
 #include "ScreenCapture.h"
 #include "VideoEncoder.h"
 #include "NetworkServer.h"
@@ -22,12 +21,10 @@
 class ScreenApp : public BApplication {
 public:
     ScreenApp() : BApplication(APP_SIGNATURE) {
-        fArea = -1;
         fNetworkThread = -1;
         fCaptureThread = -1;
         fTerminating = false;
         fCapturing = false;
-        fRingBuffer = nullptr;
         fScreenCapture = new ScreenCapture();
         fVideoEncoder = new VideoEncoder();
         fNetworkServer = nullptr;
@@ -185,15 +182,12 @@ public:
     }
 
 private:
-    area_id fArea;
-
     thread_id fNetworkThread;
     thread_id fCaptureThread;
 
     volatile bool fTerminating;
     volatile bool fCapturing;
 
-    RingBuffer *fRingBuffer;
     ScreenCapture *fScreenCapture;
     VideoEncoder *fVideoEncoder;
     NetworkServer *fNetworkServer;
@@ -211,22 +205,9 @@ private:
         return ((ScreenApp *) data)->_CaptureLoop();
     }
 
-    status_t _InitResources() {
-        // 1. Shared Memory Area (Still used for legacy/debugging or if we want RingBuffer)
-        // We actually don't Strictly need RingBuffer for direct broadcast anymore,
-        // but we kept it in refactor. We can keep it or remove it.
-        // Let's keep it for now as a bufferstage if needed, or just ignore it.
-        // We'll write to it just to be safe/consistent with logic.
-        void *addr = nullptr;
-        size_t ringSize = (RING_BUFFER_SIZE + B_PAGE_SIZE - 1) & ~(B_PAGE_SIZE - 1);
-        fArea = create_area(AREA_NAME, &addr, B_ANY_ADDRESS, ringSize,
-                            B_FULL_LOCK, B_READ_AREA | B_WRITE_AREA | B_CLONEABLE_AREA);
-
-        if (fArea < B_OK) return fArea;
-
-        fRingBuffer = new RingBuffer(addr, ringSize);
-        return B_OK;
-    }
+	status_t _InitResources() {
+		return B_OK;
+	}
 
     status_t _NetworkLoop() {
         while (!fTerminating && fNetworkServer) {
@@ -443,8 +424,6 @@ private:
     }
 
     void _Cleanup() {
-        if (fRingBuffer) delete fRingBuffer;
-        if (fArea >= 0) delete_area(fArea);
     }
 
     void _HandleClipboard(const char *text) {
