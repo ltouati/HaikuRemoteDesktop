@@ -2,8 +2,6 @@
  * ScreenCapture.cpp
  */
 #include "ScreenCapture.h"
-#include <stdio.h>
-#include <string.h>
 #include <InterfaceDefs.h>
 #include <WindowScreen.h>
 

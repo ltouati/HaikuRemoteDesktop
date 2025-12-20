@@ -6,7 +6,6 @@
 #define SCREEN_CAPTURE_H
 
 #include <InterfaceDefs.h>
-#include <Bitmap.h>
 #include <Screen.h>
 #include <DirectWindow.h>
 #include <Locker.h>
@@ -34,8 +33,6 @@ public:
     int32 Height() const { return fHeight; }
 
     bool IsConnected() const { return fScreenBits != nullptr; }
-
-    BView *GetCaptureView() const { return fCaptureView; }
 
 private:
     BLocker fLock;

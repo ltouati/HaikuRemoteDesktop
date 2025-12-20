@@ -38,9 +38,6 @@ private:
     // SIMD Color Conversion
     void _RGBToYUV420(const uint8 *rgb, int32 stride, vpx_image_t *img, const int width, const int height);
 
-    // Manual Cursor Rendering
-    void _DrawCursor(vpx_image_t *img, int x, int y);
-
     BString fCodecName;
 };
 
