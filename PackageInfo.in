@@ -26,7 +26,7 @@ licenses "MIT"
 provides {
 	HaikuRemoteDesktop = @APP_VERSION@
 	app:ScreenServer = @APP_VERSION@
-	app:RemoteDesktopPreferences = @APP_VERSION@
+	app:HaikuRemoteDesktopPreferences = @APP_VERSION@
 }
 
 requires {

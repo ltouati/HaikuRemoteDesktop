@@ -34,10 +34,13 @@ add_custom_target(package_haiku
     COMMAND ${CMAKE_COMMAND} -E make_directory ${STAGING_DIR}/apps/HaikuRemoteDesktop
     COMMAND ${CMAKE_COMMAND} -E make_directory ${STAGING_DIR}/add-ons/input_server/devices
     COMMAND ${CMAKE_COMMAND} -E make_directory ${STAGING_DIR}/data/deskbar/menu/Applications
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${STAGING_DIR}/preferences
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${STAGING_DIR}/data/deskbar/menu/Preferences
     
     # 3. Copy Binaries
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:screen_server> ${STAGING_DIR}/apps/HaikuRemoteDesktop/HaikuRemoteDesktop
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:virtual_input_server_addon> ${STAGING_DIR}/add-ons/input_server/devices/virtual_input_server_addon
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:HaikuRemoteDesktopPreferences> ${STAGING_DIR}/preferences/HaikuRemoteDesktopPreferences
     
     # 4. Copy Web Assets
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/src/UserlandServer/index.html ${STAGING_DIR}/apps/HaikuRemoteDesktop/index.html
@@ -49,9 +52,10 @@ add_custom_target(package_haiku
 
     # 6. Create Deskbar Symlink
     COMMAND ${CMAKE_COMMAND} -E create_symlink ../../../../apps/HaikuRemoteDesktop/HaikuRemoteDesktop ${STAGING_DIR}/data/deskbar/menu/Applications/HaikuRemoteDesktop
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ../../../../preferences/HaikuRemoteDesktopPreferences ${STAGING_DIR}/data/deskbar/menu/Preferences/HaikuRemoteDesktopPreferences
     
     # 7. Create Package (Remove -b flag!)
     COMMAND package create -v -i ${CMAKE_BINARY_DIR}/PackageInfo -C ${STAGING_DIR} ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}
     
-    DEPENDS screen_server virtual_input_server_addon
+    DEPENDS screen_server virtual_input_server_addon HaikuRemoteDesktopPreferences
 )

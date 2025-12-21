@@ -114,57 +114,19 @@ target_link_libraries(screen_server
 )
 
 # Preferences Application
-add_executable(RemoteDesktopPreferences
+add_executable(HaikuRemoteDesktopPreferences
     ../Preferences/RemoteDesktopPreflet.cpp
     ../Preferences/SettingsWindow.cpp
     Settings.cpp
 )
 
 # Include directories for Preferences to find Settings.h
-target_include_directories(RemoteDesktopPreferences PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(HaikuRemoteDesktopPreferences PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(RemoteDesktopPreferences
+target_link_libraries(HaikuRemoteDesktopPreferences
     PRIVATE
     be
     network
 )
 
-# Install/Copy the binary to dist (Updated for new app)
-# ...
 
-# Install/Copy the binary to dist (Manual Layout for Package)
-add_custom_command(TARGET screen_server POST_BUILD
-        # Create Directories (ScreenServer side)
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist/apps/HaikuRemoteDesktop
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist/add-ons/input_server/devices
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist/data/deskbar/menu/Applications
-
-        # Copy ScreenServer Files
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:screen_server> ${CMAKE_BINARY_DIR}/dist/apps/HaikuRemoteDesktop/HaikuRemoteDesktop
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/index.html ${CMAKE_BINARY_DIR}/dist/apps/HaikuRemoteDesktop/index.html
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/messages.js ${CMAKE_BINARY_DIR}/dist/apps/HaikuRemoteDesktop/messages.js
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/style.css ${CMAKE_BINARY_DIR}/dist/apps/HaikuRemoteDesktop/style.css
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:virtual_input_server_addon> ${CMAKE_BINARY_DIR}/dist/add-ons/input_server/devices/virtual_input_server_addon
-        
-        # Symlinks
-        COMMAND ln -sf ../../../apps/HaikuRemoteDesktop/HaikuRemoteDesktop ${CMAKE_BINARY_DIR}/dist/data/deskbar/menu/Applications/HaikuRemoteDesktop
-)
-
-add_custom_command(TARGET RemoteDesktopPreferences POST_BUILD
-        # Create Directories (Preferences side)
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist/preferences
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist/data/deskbar/menu/Preferences
-
-        # Copy Preferences Files
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:RemoteDesktopPreferences> ${CMAKE_BINARY_DIR}/dist/preferences/RemoteDesktopPreferences
-        
-        # Symlinks
-        COMMAND ln -sf ../../../preferences/RemoteDesktopPreferences ${CMAKE_BINARY_DIR}/dist/data/deskbar/menu/Preferences/RemoteDesktopPreferences
-)
-
-# Package Creation Target
-add_custom_target(haiku_package ALL
-    COMMAND package create -b -i ${CMAKE_BINARY_DIR}/PackageInfo -C ${CMAKE_BINARY_DIR}/dist HaikuRemoteDesktop-${APP_VERSION}-x86_64.hpkg
-    DEPENDS screen_server RemoteDesktopPreferences virtual_input_server_addon
-    COMMENT "Building Haiku Package..."
-)

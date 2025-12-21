@@ -77,7 +77,7 @@
                     class="max-w-full max-h-full shadow-2xl ring-1 ring-white/10 cursor-none rendering-pixelated rounded-3xl"></canvas>
 
                 <!-- Sidebar Toggle Button (Floating Chevron) - Overlay on Canvas Edge -->
-                <button id="sidebar-toggle" onclick="toggleSidebar()"
+                <button id="sidebar-toggle" onclick="toggleSidebar(); this.blur()"
                     class="absolute right-2 top-1/2 -translate-y-1/2 z-30 bg-indigo-600/80 hover:bg-indigo-500 text-white p-2 rounded-full shadow-lg transition-all duration-300 opacity-0 group-hover:opacity-100 hidden hover:scale-110 backdrop-blur-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
@@ -96,7 +96,7 @@
         <div
             class="h-16 flex items-center justify-between px-6 border-b border-sidebarBorder bg-white/5 backdrop-blur-sm">
             <span class="font-semibold text-lg text-white">Options</span>
-            <button onclick="toggleSidebar()"
+            <button onclick="toggleSidebar(); this.blur()"
                 class="text-zinc-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
                     stroke="currentColor">
@@ -1119,6 +1119,11 @@
 
             // Keyboard
             window.addEventListener('keydown', (e) => {
+                // Prevent Tab from changing focus
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                }
+
                 if (e.key === 'f' || e.key === 'F') { // Only if not typing in inputs (none yet)
                     // But sidebar might grab focus?
                     // No inputs in sidebar yet.
