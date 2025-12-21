@@ -75,6 +75,7 @@ add_executable(screen_server
         messages.pb.cc
         ${CMAKE_CURRENT_BINARY_DIR}/messages.js
         ${CMAKE_CURRENT_BINARY_DIR}/style.css
+        index.html
 )
 
 # Generate style.css
@@ -105,7 +106,6 @@ add_custom_command(TARGET screen_server POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:screen_server> ${CMAKE_BINARY_DIR}/dist/screen_server
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/index.html ${CMAKE_BINARY_DIR}/dist/index.html
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/messages.js ${CMAKE_BINARY_DIR}/dist/messages.js
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/style.css ${CMAKE_BINARY_DIR}/dist/style.css
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/style.css ${CMAKE_BINARY_DIR}/dist/style.css
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:virtual_input_server_addon> ${CMAKE_BINARY_DIR}/dist/virtual_input_server_addon.so
 )

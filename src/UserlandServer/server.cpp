@@ -8,7 +8,6 @@
 #include "ScreenCapture.h"
 #include "VideoEncoder.h"
 #include "NetworkServer.h"
-#include "NetworkServer.h"
 #include "InputDriverManager.h"
 #include "NetworkUtils.h"
 #include <Screen.h>
@@ -90,7 +89,7 @@ public:
         }
 
         fNetworkServer->SetTarget(BMessenger(this));
-
+        
         fNetworkThread = spawn_thread(_NetworkLoopSync, "Network Server",
                                       B_NORMAL_PRIORITY, this);
 
