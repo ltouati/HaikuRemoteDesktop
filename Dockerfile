@@ -25,22 +25,26 @@ RUN mkdir -p /boot/system
 
 # Download Base + Devel packages
 # We include the 'haiku' base package to provide system data (licenses) so 'package create' works.
-RUN wget https://eu.hpkg.haiku-os.org/haiku/master/x86_64/current/packages/haiku-r1~beta5_hrev59221-1-x86_64.hpkg \
+RUN wget https://eu.hpkg.haiku-os.org/haiku/master/x86_64/current/packages/haiku-r1~beta5_hrev59237-1-x86_64.hpkg \
     && wget https://eu.hpkg.haiku-os.org/haikuports/master/x86_64/current/packages/libvpx-1.13.1-1-x86_64.hpkg \
     && wget https://eu.hpkg.haiku-os.org/haikuports/master/x86_64/current/packages/libvpx_devel-1.13.1-1-x86_64.hpkg \
     && wget https://eu.hpkg.haiku-os.org/haikuports/master/x86_64/current/packages/openssl3-3.5.4-1-x86_64.hpkg \
     && wget https://eu.hpkg.haiku-os.org/haikuports/master/x86_64/current/packages/openssl3_devel-3.5.4-1-x86_64.hpkg \
     && wget https://eu.hpkg.haiku-os.org/haikuports/master/x86_64/current/packages/protobuf-3.20.1-1-x86_64.hpkg \
-    && wget https://eu.hpkg.haiku-os.org/haikuports/master/x86_64/current/packages/protobuf_devel-3.20.1-1-x86_64.hpkg
+    && wget https://eu.hpkg.haiku-os.org/haikuports/master/x86_64/current/packages/protobuf_devel-3.20.1-1-x86_64.hpkg \
+    && wget https://eu.hpkg.haiku-os.org/haikuports/master/x86_64/current/packages/x264-20220222-1-x86_64.hpkg \
+    && wget https://eu.hpkg.haiku-os.org/haikuports/master/x86_64/current/packages/x264_devel-20220222-1-x86_64.hpkg
 
 # Extract them to /boot/system
-RUN package extract -C /boot/system haiku-r1~beta5_hrev59221-1-x86_64.hpkg \
+RUN package extract -C /boot/system haiku-r1~beta5_hrev59237-1-x86_64.hpkg \
     && package extract -C /boot/system libvpx-1.13.1-1-x86_64.hpkg \
     && package extract -C /boot/system libvpx_devel-1.13.1-1-x86_64.hpkg \
     && package extract -C /boot/system openssl3-3.5.4-1-x86_64.hpkg \
     && package extract -C /boot/system openssl3_devel-3.5.4-1-x86_64.hpkg \
     && package extract -C /boot/system protobuf-3.20.1-1-x86_64.hpkg \
     && package extract -C /boot/system protobuf_devel-3.20.1-1-x86_64.hpkg \
+    && package extract -C /boot/system x264-20220222-1-x86_64.hpkg \
+    && package extract -C /boot/system x264_devel-20220222-1-x86_64.hpkg \
     && rm *.hpkg
 
 # Create symlink /system -> /boot/system (package tool workaround)

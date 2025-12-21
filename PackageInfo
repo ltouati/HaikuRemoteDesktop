@@ -1,6 +1,6 @@
 
 name HaikuRemoteDesktop
-version 1.0.0-1
+version 1.0.1-1
 architecture x86_64
 
 summary "Remote Control your Haiku system via Web Browser"
@@ -24,8 +24,8 @@ copyrights "2025 Lionel Touati"
 licenses "MIT"
 
 provides {
-	HaikuRemoteDesktop = 1.0.0-1
-	app:ScreenServer = 1.0.0-1
+	HaikuRemoteDesktop = 1.0.1-1
+	app:ScreenServer = 1.0.1-1
 }
 
 requires {
@@ -34,4 +34,5 @@ requires {
 	lib:libcrypto
 	lib:libprotobuf
 	lib:libvpx
+	lib:libx264
 }
