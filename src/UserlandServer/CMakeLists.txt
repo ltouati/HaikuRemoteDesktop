@@ -32,7 +32,20 @@ find_library(X264_LIBRARY x264 REQUIRED)
 
 # Generate Sources
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS messages.proto)
+find_program(NPM_EXECUTABLE npm REQUIRED)
 
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/node_modules/.install-stamp"
+    COMMAND ${NPM_EXECUTABLE} install
+    COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_SOURCE_DIR}/node_modules/.install-stamp"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/package.json"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Installing npm dependencies..."
+)
+
+add_custom_target(npm_dependencies ALL 
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/node_modules/.install-stamp"
+)
 # Generate messages.js
 # Generate messages.js
 add_custom_command(

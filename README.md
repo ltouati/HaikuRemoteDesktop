@@ -23,32 +23,33 @@ The system consists of two main components:
 ## Requirements
 
 -   **Haiku OS** (x86_64)
--   **Dependencies**:
-    -   `openssl`
-    -   `protobuf`
-    -   `vpx` (libvpx)
-
+  
 ## Build Instructions
 
-1.  **Clone the repository**:
+1. **Install Dependencies**
+    ```bash
+    pkgman install cmake gcc make nodejs20 rsync protobuf_devel x264_devel npm
+    ```
+
+2.  **Clone the repository**:
     ```bash
     git clone https://github.com/your-repo/HaikuRemoteDesktop.git
     cd HaikuRemoteDesktop
     ```
 
-2.  **Create a build directory**:
+3.  **Create a build directory**:
     ```bash
     mkdir build
     cd build
     ```
 
-3.  **Configure and Build**:
+4.  **Configure and Build**:
     ```bash
     cmake ..
     make
     ```
 
-4.  **Create Haiku Package (.hpkg)**:
+5.  **Create Haiku Package (.hpkg)**:
     To generate an installable package:
     ```bash
     make package_haiku
