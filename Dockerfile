@@ -66,4 +66,4 @@ WORKDIR /work
 COPY . .
 
 # 5. Define build command
-CMD ["sh", "-c", "mkdir -p build && cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE -GNinja -DProtobuf_PROTOC_EXECUTABLE=/usr/local/bin/protoc -DRELEASE_MODE=ON && ninja package_haiku"]
+CMD ["sh", "-c", "mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE -GNinja -DProtobuf_PROTOC_EXECUTABLE=/usr/local/bin/protoc -DRELEASE_MODE=ON -DRC_COMPILER=OFF && ninja package_haiku"]

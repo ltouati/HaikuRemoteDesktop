@@ -5,6 +5,12 @@ project(HaikuRemoteDesktop)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
 
+# Centralized Version
+set(APP_VERSION "1.0.2-1")
+
+# Configure PackageInfo
+configure_file(PackageInfo.in PackageInfo @ONLY)
+
 include_directories("/boot/system/develop/headers/private/kernel")
 
 # Add Sub-projects
@@ -14,7 +20,7 @@ add_subdirectory(src/UserlandServer)
 message(STATUS "Build configured. output will be in: ${CMAKE_BINARY_DIR}/dist")
 
 # Haiku Package Creation
-set(PACKAGE_NAME "HaikuRemoteDesktop-1.0.1-1-x86_64.hpkg")
+set(PACKAGE_NAME "HaikuRemoteDesktop-${APP_VERSION}-x86_64.hpkg")
 set(STAGING_DIR "${CMAKE_BINARY_DIR}/package_staging")
 
 add_custom_target(package_haiku
@@ -45,7 +51,7 @@ add_custom_target(package_haiku
     COMMAND ${CMAKE_COMMAND} -E create_symlink ../../../../apps/HaikuRemoteDesktop/HaikuRemoteDesktop ${STAGING_DIR}/data/deskbar/menu/Applications/HaikuRemoteDesktop
     
     # 7. Create Package (Remove -b flag!)
-    COMMAND package create -v -i ${CMAKE_SOURCE_DIR}/PackageInfo -C ${STAGING_DIR} ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}
+    COMMAND package create -v -i ${CMAKE_BINARY_DIR}/PackageInfo -C ${STAGING_DIR} ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}
     
     DEPENDS screen_server virtual_input_server_addon
 )

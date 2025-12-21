@@ -4,18 +4,23 @@
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <Notification.h>
 
 #include "ScreenCapture.h"
 #include "VideoEncoder.h"
 #include "NetworkServer.h"
 #include "InputDriverManager.h"
 #include "NetworkUtils.h"
+#include "NetworkUtils.h"
 #include <Screen.h>
 #include <Clipboard.h>
+#include "Settings.h"
 
 #define APP_SIGNATURE "application/x-vnd.Haiku-ScreenCaster"
 #define AREA_NAME "screen_capture_shm"
 #define RING_BUFFER_SIZE (16 * 1024 * 1024)
+
+#define MSG_SETTINGS_CHANGED 'stch'
 
 class ScreenApp : public BApplication {
 public:
@@ -28,6 +33,7 @@ public:
         fVideoEncoder = new VideoEncoder();
         fNetworkServer = nullptr;
         fInputManager = new InputDriverManager();
+        fSettings = new Settings();
         fCurrentCodec = "vp8";
         fTargetFps = 30;
         fFrameWaitTime = 33333; // ~30 FPS
@@ -47,6 +53,9 @@ public:
         if (fInputManager) {
             delete fInputManager;
         }
+        if (fSettings) {
+            delete fSettings;
+        }
         delete_sem(fCaptureSem);
     }
 
@@ -58,6 +67,8 @@ public:
             return;
         }
 
+
+        fSettings->Load();
 
         // 1. Install Driver & Restart Input Server
 #ifndef RELEASE_MODE
@@ -82,10 +93,17 @@ public:
         }
 
         fNetworkServer = new NetworkServer(inputPort);
-        if (fNetworkServer->Start(8443) < B_OK) {
+        if (fNetworkServer->Start(fSettings->Port(), fSettings->SSLCertPath(), fSettings->SSLKeyPath()) < B_OK) {
             fprintf(stderr, "Failed to bind to port 8443\n");
             Quit();
             return;
+        } else {
+             BNotification notification(B_INFORMATION_NOTIFICATION);
+             notification.SetTitle("Haiku Remote Desktop");
+             BString content;
+             content.SetToFormat("Server started.\nListening on port %d", fSettings->Port());
+             notification.SetContent(content);
+             notification.Send();
         }
 
         fNetworkServer->SetTarget(BMessenger(this));
@@ -101,8 +119,9 @@ public:
 
         resume_thread(fNetworkThread);
 
+
         // Waiting for client...
-        printf("Screen Capture Server Running on http://0.0.0.0:8443 (Waiting for client)\n");
+        printf("Screen Capture Server Running on 0.0.0.0:%d (Waiting for client)\n", fSettings->Port());
     }
 
     virtual void MessageReceived(BMessage *msg) {
@@ -154,6 +173,9 @@ public:
                 }
                 break;
             }
+            case MSG_SETTINGS_CHANGED:
+                _RestartServer();
+                break;
             default:
                 BApplication::MessageReceived(msg);
         }
@@ -189,6 +211,45 @@ public:
         return true;
     }
 
+    void _RestartServer() {
+        printf("Restarting Server with new settings...\n");
+        
+        if (fNetworkServer) {
+            fNetworkServer->Stop();
+            // Wait for thread?
+            status_t exitVal;
+            wait_for_thread(fNetworkThread, &exitVal);
+            delete fNetworkServer;
+        }
+
+        // Reload settings in case they changed on disk
+        fSettings->Load();
+
+        // Re-init Network Server
+        port_id inputPort = find_port("virtual_mouse_input");
+        if (inputPort < 0) {
+             fprintf(stderr, "VirtualMouse port lost?\n");
+             // Retry or fail?
+        }
+
+        fNetworkServer = new NetworkServer(inputPort);
+        status_t status = fNetworkServer->Start(fSettings->Port(), fSettings->SSLCertPath(), fSettings->SSLKeyPath());
+        if (status != B_OK) {
+            fprintf(stderr, "Failed to restart network server: %s\n", strerror(status));
+             // Show alert?
+        } else {
+             fNetworkServer->SetTarget(BMessenger(this));
+             fNetworkThread = spawn_thread(_NetworkLoopSync, "Network Server", B_NORMAL_PRIORITY, this);
+             resume_thread(fNetworkThread);
+             BNotification notification(B_INFORMATION_NOTIFICATION);
+             notification.SetTitle("Haiku Remote Desktop");
+             BString content;
+             content.SetToFormat("Server restarted.\nListening on port %d", fSettings->Port());
+             notification.SetContent(content);
+             notification.Send();
+        }
+    }
+
 private:
     thread_id fNetworkThread;
     thread_id fCaptureThread;
@@ -200,6 +261,7 @@ private:
     VideoEncoder *fVideoEncoder;
     NetworkServer *fNetworkServer;
     InputDriverManager *fInputManager;
+    Settings *fSettings;
     BString fCurrentCodec;
     int32 fTargetFps;
     bigtime_t fFrameWaitTime;

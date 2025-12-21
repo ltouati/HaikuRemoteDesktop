@@ -1,6 +1,6 @@
 
 name HaikuRemoteDesktop
-version 1.0.1-1
+version @APP_VERSION@
 architecture x86_64
 
 summary "Remote Control your Haiku system via Web Browser"
@@ -24,8 +24,9 @@ copyrights "2025 Lionel Touati"
 licenses "MIT"
 
 provides {
-	HaikuRemoteDesktop = 1.0.1-1
-	app:ScreenServer = 1.0.1-1
+	HaikuRemoteDesktop = @APP_VERSION@
+	app:ScreenServer = @APP_VERSION@
+	app:RemoteDesktopPreferences = @APP_VERSION@
 }
 
 requires {

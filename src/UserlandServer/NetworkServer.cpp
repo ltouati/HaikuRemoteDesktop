@@ -38,34 +38,7 @@ NetworkServer::NetworkServer(port_id inputPort)
     OpenSSL_add_all_algorithms();
     SSL_load_error_strings();
 
-    fSSLContext = SSL_CTX_new(TLS_server_method());
-    if (!fSSLContext) {
-        fprintf(stderr, "Unable to create SSL context\n");
-        ERR_print_errors_fp(stderr);
-    } else {
-        // Auto-generate Self-Signed Cert if missing
-        BEntry certEntry("server.crt");
-        BEntry keyEntry("server.key");
-        if (!certEntry.Exists() || !keyEntry.Exists()) {
-            printf("SSL Certificates not found. Generating self-signed certificate...\n");
-            int ret = system(
-                "openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj \"/C=US/ST=State/L=City/O=HaikuRemote/CN=localhost\"");
-            if (ret != 0) {
-                fprintf(stderr, "Failed to generate SSL certificates (openssl command failed)\n");
-            }
-        }
-
-        // Load Certs
-        // Assume server.crt and server.key are in the CWD
-        if (SSL_CTX_use_certificate_file(fSSLContext, "server.crt", SSL_FILETYPE_PEM) <= 0) {
-            fprintf(stderr, "Failed to load server.crt\n");
-            ERR_print_errors_fp(stderr);
-        }
-        if (SSL_CTX_use_PrivateKey_file(fSSLContext, "server.key", SSL_FILETYPE_PEM) <= 0) {
-            fprintf(stderr, "Failed to load server.key\n");
-            ERR_print_errors_fp(stderr);
-        }
-    }
+    // Context created in Start()
 }
 
 NetworkServer::~NetworkServer() {
@@ -101,7 +74,35 @@ NetworkServer::GetLastCursor(float &x, float &y, bigtime_t &time) {
 }
 
 status_t
-NetworkServer::Start(uint16 port) {
+NetworkServer::Start(uint16 port, const char* certPath, const char* keyPath) {
+
+    // Certificates are expected to be managed by the Preferences app
+    // or exist at the default locations.
+    if (!fSSLContext) {
+        // ... (Error handling if context creation failed previously, though it's done before)
+    }
+
+    // Try to load certificates directly
+
+    if (fSSLContext) SSL_CTX_free(fSSLContext);
+    fSSLContext = SSL_CTX_new(TLS_server_method());
+    
+    if (!fSSLContext) {
+        fprintf(stderr, "Unable to create SSL context\n");
+        ERR_print_errors_fp(stderr);
+        return B_ERROR;
+    }
+
+    if (SSL_CTX_use_certificate_file(fSSLContext, certPath, SSL_FILETYPE_PEM) <= 0) {
+        fprintf(stderr, "Failed to load cert: %s\n", certPath);
+        ERR_print_errors_fp(stderr);
+    }
+    if (SSL_CTX_use_PrivateKey_file(fSSLContext, keyPath, SSL_FILETYPE_PEM) <= 0) {
+        fprintf(stderr, "Failed to load key: %s\n", keyPath);
+        ERR_print_errors_fp(stderr);
+    }
+
+
     fServerSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (fServerSocket < 0) return B_ERROR;
 

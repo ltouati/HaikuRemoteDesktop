@@ -54,13 +54,13 @@ The system consists of two main components:
     ```bash
     make package_haiku
     ```
-    This will create `HaikuRemoteDesktop-1.0.1-1-x86_64.hpkg` in your build directory.
+    This will create `HaikuRemoteDesktop-<version>-x86_64.hpkg` in your build directory.
 
 ## Installation & Usage
 
 ### Method 1: Install Package (Recommended)
 
-1.  Double-click `HaikuRemoteDesktop-1.0.1-1-x86_64.hpkg` to install it.
+1.  Double-click the generated `HaikuRemoteDesktop-*-x86_64.hpkg` to install it.
 2.  Open the **Deskbar**, navigate to **Applications**, and launch **HaikuRemoteDesktop**.
 3.  The server will start in the background.
 

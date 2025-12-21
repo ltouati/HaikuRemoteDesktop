@@ -44,7 +44,7 @@ public:
 
     ~NetworkServer();
 
-    status_t Start(uint16 port);
+    status_t Start(uint16 port, const char* certPath = "server.crt", const char* keyPath = "server.key");
 
     void Stop();
 
