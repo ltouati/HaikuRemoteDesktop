@@ -14,7 +14,7 @@ add_subdirectory(src/UserlandServer)
 message(STATUS "Build configured. output will be in: ${CMAKE_BINARY_DIR}/dist")
 
 # Haiku Package Creation
-set(PACKAGE_NAME "HaikuRemoteDesktop-1.0.0-1-x86_64.hpkg")
+set(PACKAGE_NAME "HaikuRemoteDesktop-1.0.1-1-x86_64.hpkg")
 set(STAGING_DIR "${CMAKE_BINARY_DIR}/package_staging")
 
 add_custom_target(package_haiku
