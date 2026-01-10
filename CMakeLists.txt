@@ -6,7 +6,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
 
 # Centralized Version
-set(APP_VERSION "1.0.2-1")
+set(APP_VERSION "1.0.3-1")
 
 # Configure PackageInfo
 configure_file(PackageInfo.in PackageInfo @ONLY)
