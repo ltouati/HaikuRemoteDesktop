@@ -179,9 +179,16 @@ status_t VirtualMouse::_InputLoop(void *arg) {
 
                 uint32 what = packet.data.key.down ? B_KEY_DOWN : B_KEY_UP;
 
+                uint32 c = packet.data.key.key_utf32;
+
+                // Handle Control Keys (Ctrl-C -> 0x03)
+                if (packet.data.key.modifiers & B_CONTROL_KEY) {
+                    if (c >= 'a' && c <= 'z') c -= 96;
+                    else if (c >= 'A' && c <= 'Z') c -= 64;
+                }
+
                 // Convert UTF-32 to UTF-8
                 char utf8[5] = {0};
-                uint32 c = packet.data.key.key_utf32;
                 if (c < 0x80) {
                     utf8[0] = (char) c;
                 } else if (c < 0x800) {

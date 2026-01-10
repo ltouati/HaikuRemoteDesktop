@@ -8,6 +8,7 @@
 #include <Window.h>
 #include <TextControl.h>
 #include <TextView.h>
+#include <CheckBox.h>
 #include <Button.h>
 
 class Settings;
@@ -23,6 +24,7 @@ public:
 private:
     Settings* fSettings;
     BTextControl* fPortInput;
+    BCheckBox* fStartOnBoot;
     BTextView* fCertView;
     BTextView* fKeyView;
     BButton* fApplyButton;

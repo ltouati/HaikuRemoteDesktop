@@ -14,6 +14,7 @@
     <!-- Protobuf -->
     <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.5/dist/protobuf.min.js"></script>
     <script src="messages.js?v=2"></script>
+    <link rel="manifest" href="manifest.json">
 
     <style>
         body {
@@ -1129,11 +1130,14 @@
                     // No inputs in sidebar yet.
                 }
 
-                if (e.repeat) return;
+                // if (e.repeat) return; // Removed to allow key repeat
+
                 const charCode = e.key.length === 1 ? e.key.charCodeAt(0) : 0;
                 let modifiers = 0;
-                if (e.shiftKey) modifiers |= 0x0001;
-                if (e.ctrlKey) modifiers |= 0x0002;
+                if (e.shiftKey) modifiers |= 0x0001; // B_SHIFT_KEY
+                if (e.ctrlKey) modifiers |= 0x0004;  // B_CONTROL_KEY
+                if (e.altKey) modifiers |= 0x0002;   // B_COMMAND_KEY (Alt)
+                if (e.metaKey) modifiers |= 0x0002;  // B_COMMAND_KEY (Mac Command)
                 sendEvent({ key: { keyCode: 0, down: true, modifiers: modifiers, keyUtf32: charCode, keyString: e.code } });
             });
 

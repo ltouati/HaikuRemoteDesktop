@@ -54,6 +54,21 @@ add_custom_command(
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/messages.proto
         COMMENT "Generating messages.js from messages.proto into build dir"
 )
+add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/style.css
+        COMMAND node ${CMAKE_CURRENT_SOURCE_DIR}/node_modules/tailwindcss/lib/cli.js -i ${CMAKE_CURRENT_SOURCE_DIR}/input.css -o ${CMAKE_CURRENT_BINARY_DIR}/style.css
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/input.css ${CMAKE_CURRENT_SOURCE_DIR}/tailwind.config.js ${CMAKE_CURRENT_SOURCE_DIR}/index.html
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating style.css from input.css"
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/messages.js ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/style.css
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/src/UserlandServer/index.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/src/UserlandServer/messages.js ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/src/UserlandServer/style.css ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/style.css ${CMAKE_SOURCE_DIR}/src/UserlandServer/index.html ${CMAKE_BINARY_DIR}/src/UserlandServer/messages.js
+)
 
 # Build the C++ Screen Server
 
@@ -86,19 +101,12 @@ add_executable(screen_server
         handlers/ClipboardPacketHandler.cpp
         handlers/PacketHandlerFactory.cpp
         messages.pb.cc
-        ${CMAKE_CURRENT_BINARY_DIR}/messages.js
-        ${CMAKE_CURRENT_BINARY_DIR}/style.css
-        index.html
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/messages.js
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/style.css
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html
 )
 
 # Generate style.css
-add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/style.css
-        COMMAND node ${CMAKE_CURRENT_SOURCE_DIR}/node_modules/tailwindcss/lib/cli.js -i ${CMAKE_CURRENT_SOURCE_DIR}/input.css -o ${CMAKE_CURRENT_BINARY_DIR}/style.css
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/input.css ${CMAKE_CURRENT_SOURCE_DIR}/tailwind.config.js ${CMAKE_CURRENT_SOURCE_DIR}/index.html
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Generating style.css from input.css"
-)
 
 include_directories(handlers)
 
@@ -112,6 +120,7 @@ target_link_libraries(screen_server
         OpenSSL::SSL
         OpenSSL::Crypto
 )
+
 
 # Preferences Application
 add_executable(HaikuRemoteDesktopPreferences
